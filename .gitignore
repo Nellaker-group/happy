@@ -197,6 +197,7 @@ out/
 **/graph_splits
 **/datasets
 !happy/data/datasets
+!projects/placenta/plots
 *.pth
 *.pt
 *.csv
