@@ -4,7 +4,7 @@ from typing import Optional
 import typer
 
 from happy.organs import get_organ
-from happy.utils.utils import get_device
+from happy.utils.utils import get_device, get_project_dir
 from happy.cell_infer import nuclei_infer, cell_infer
 import happy.db.eval_runs_interface as db
 
@@ -54,6 +54,7 @@ def main(
         get_cuda_device_num: if you want the code to choose a gpu
     """
     device = get_device(get_cuda_device_num)
+    project_dir = get_project_dir(project_name)
 
     # Create database connection
     db.init()
@@ -63,6 +64,7 @@ def main(
         start = time.time()
         # Perform all nuclei evaluation
         run_id = nuclei_eval_pipeline(
+            project_dir,
             nuc_model_id,
             slide_id,
             run_id,
@@ -80,7 +82,7 @@ def main(
         start = time.time()
         # Perform all nuclei evaluation
         cell_eval_pipeline(
-            project_name,
+            project_dir,
             organ_name,
             cell_model_id,
             run_id,
@@ -93,6 +95,7 @@ def main(
 
 
 def nuclei_eval_pipeline(
+    project_dir,
     model_id,
     slide_id,
     run_id,
@@ -103,7 +106,7 @@ def nuclei_eval_pipeline(
     device,
 ):
     # Load model weights and push to device
-    model = nuclei_infer.setup_model(model_id, device)
+    model = nuclei_infer.setup_model(project_dir, model_id, device)
     # Load datasets and dataloader
     dataloader, pred_saver = nuclei_infer.setup_data(
         slide_id, run_id, model_id, batch_size, overlap=200, num_workers=num_workers
@@ -117,7 +120,7 @@ def nuclei_eval_pipeline(
 
 
 def cell_eval_pipeline(
-    project_name,
+    project_dir,
     organ_name,
     model_id,
     run_id,
@@ -128,7 +131,7 @@ def cell_eval_pipeline(
     organ = get_organ(organ_name)
     # Load model weights and push to device
     model = cell_infer.setup_model(
-        model_id, len(organ.cells), device
+        project_dir, model_id, len(organ.cells), device
     )
     # Load datasets and dataloader
     dataloader, pred_saver = cell_infer.setup_data(
@@ -138,7 +141,7 @@ def cell_eval_pipeline(
         num_workers=num_workers,
     )
     # Setup or get path to embeddings hdf5 save location
-    embeddings_path = cell_infer.setup_embedding_saving(project_name, pred_saver.id)
+    embeddings_path = cell_infer.setup_embedding_saving(project_dir, pred_saver.id)
     # Predict cell classes
     cell_infer.run_cell_eval(dataloader, model, pred_saver, embeddings_path, device)
     cell_infer.clean_up(pred_saver)

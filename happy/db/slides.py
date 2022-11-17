@@ -10,7 +10,7 @@ class Patient(BaseModel):
 
 class Lab(BaseModel):
     country = TextField()
-    primary_contact = TextField()
+    primary_contact = TextField(null=True)
     slides_dir = TextField()
     study_name = TextField(null=True)
     has_pathologists_notes = BooleanField(null=True)

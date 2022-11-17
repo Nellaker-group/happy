@@ -21,15 +21,15 @@ import happy.db.eval_runs_interface as db
 
 
 # Load model weights and push to device
-def setup_model(model_id, out_features, device):
+def setup_model(project_dir, model_id, out_features, device):
     torch_home = Path(__file__).parent.parent.parent.absolute()
     os.environ["TORCH_HOME"] = str(torch_home)
 
     _, model_weights_path = db.get_model_weights_by_id(model_id)
-    print(f"model pre_trained path: {model_weights_path}")
+    print(f"model pre_trained path: {project_dir / model_weights_path}")
     model = resnet.build_resnet(out_features=out_features, depth=50)
     model.load_state_dict(
-        torch.load(model_weights_path, map_location=device), strict=True
+        torch.load(project_dir / model_weights_path, map_location=device), strict=True
     )
 
     model = model.to(device)
@@ -72,8 +72,8 @@ def setup_data(run_id, model_id, batch_size, num_workers):
 
 
 # Setup or get path to embeddings hdf5 save location
-def setup_embedding_saving(project_name, run_id):
-    embeddings_path = get_embeddings_file(project_name, run_id)
+def setup_embedding_saving(project_dir, run_id):
+    embeddings_path = get_embeddings_file(project_dir, run_id)
     if not os.path.isfile(embeddings_path):
         total_cells = db.get_total_num_nuclei(run_id)
         with h5py.File(embeddings_path, "w-") as f:

@@ -8,9 +8,7 @@ import happy.db.eval_runs_interface as db
 
 
 def main(
-    path_to_model: Path = typer.Option(
-        ..., exists=True, file_okay=True, dir_okay=False, resolve_path=True
-    ),
+    path_to_model: Path = typer.Option(...),
     model_performance: float = typer.Option(...),
     run_name: str = typer.Option(...),
     run_type: str = typer.Option(...),
@@ -24,7 +22,7 @@ def main(
     """Add a trained model to the database
 
     Args:
-        path_to_model: absolute path to final saved model
+        path_to_model: path to the saved model relative to project
         model_performance: 0-1 value of validation performance of model
         slides_dir: absolute path to the dir containing the slides
         run_name: name of the training run which generated the model

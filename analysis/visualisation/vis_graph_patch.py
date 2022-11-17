@@ -58,7 +58,7 @@ def main(
     project_dir = get_project_dir(project_name)
 
     # Get path to embeddings hdf5 files
-    embeddings_path = get_embeddings_file(project_name, run_id)
+    embeddings_path = get_embeddings_file(project_dir, run_id)
     print(f"Getting data from: {embeddings_path}")
 
     # Get hdf5 datasets contained in specified box/patch of WSI

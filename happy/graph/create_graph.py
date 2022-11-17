@@ -17,7 +17,7 @@ def get_groundtruth_patch(organ, project_dir, x_min, y_min, width, height, annot
     if not annot_tsv:
         print("No tissue annotation tsv supplied")
         return None, None, None
-    tissue_label_path = project_dir / "results" / "tissue_annots" / annot_tsv
+    tissue_label_path = project_dir / "annotations" / "graph" / annot_tsv
     if not os.path.exists(str(tissue_label_path)):
         print("No tissue label tsv found")
         return None, None, None
@@ -51,9 +51,9 @@ def get_groundtruth_patch(organ, project_dir, x_min, y_min, width, height, annot
 
 
 def get_raw_data(
-    project_name, run_id, x_min, y_min, width, height, verbose=True
+    project_dir, run_id, x_min, y_min, width, height, verbose=True
 ):
-    embeddings_path = get_embeddings_file(project_name, run_id)
+    embeddings_path = get_embeddings_file(project_dir, run_id)
     if verbose:
         print(f"Getting data from: {embeddings_path}")
         print(f"Using patch of size: x{x_min}, y{y_min}, w{width}, h{height}")
@@ -86,7 +86,6 @@ def process_knts(
         organ,
         50,
         3,
-        plot=False,
         verbose=verbose,
     )
     # Remove points from tissue ground truth as well
@@ -197,6 +196,7 @@ def make_intersection_graph(data, k, norm_edges=True, verbose=True):
     if verbose:
         print(f"Graph made with {len(data.edge_index[0])} edges!")
     return data
+
 
 def get_nodes_within_tiles(tile_coords, tile_width, tile_height, all_xs, all_ys):
     tile_min_x, tile_min_y = tile_coords[0], tile_coords[1]

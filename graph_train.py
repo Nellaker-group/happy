@@ -53,11 +53,41 @@ def main(
     use_custom_weights: bool = True,
     vis: bool = False,
     annot_tsvs: List[str] = typer.Option([]),
-    val_patch_files: Optional[List[str]] = [],
-    test_patch_files: Optional[List[str]] = [],
-    mask_unlabelled: bool = True,
+    val_patch_files: List[str] = typer.Option([]),
+    test_patch_files: Optional[List[str]] = typer.Option([]),
     validation_step: int = 25,
 ):
+    """Train a ClusterGCN model by constructing a graph on the saved cell embeddings.
+
+    :param seed: random seed to fix
+    :param project_name: name of directory containing the project
+    :param organ_name: name of organ
+    :param exp_name: a name for this training experiment
+    :param run_ids: the evalrun ids of the slides to get the embeddings from
+    :param x_min: the top left x coordinate of the patch to use
+    :param y_min: the top left y coordinate of the patch to use
+    :param width: the width of the patch to use. -1 for all
+    :param height: the height of the patch to use. -1 for all
+    :param k: the value of k to use for the kNN or intersection graph
+    :param group_knts: whether to process KNT predictions
+    :param pretrained: path to a pretrained model (optional)
+    :param graph_method: method for constructing the graph (k, delaunay, intersection)
+    :param batch_size: batch size for training
+    :param num_neighbours: max number of subgraph size for clustergcn
+    :param epochs: number of epochs to train for
+    :param layers: number of graph layers
+    :param hidden_units: number of hidden units per layer
+    :param dropout: amount of dropout to apply at each layer
+    :param learning_rate: the learning rate for the optimizer
+    :param weighted_loss: whether to use weighted loss
+    :param use_custom_weights: if using weighted loss, whether to use custom weights
+    :param vis: whether to use visdom for visualisation
+    :param annot_tsvs: the name of the annotations file containing ground truth points
+    :param val_patch_files: the name of the file(s) containing validation patches
+    :param test_patch_files: the name of the file(s) containing test patches
+    :param validation_step: the epoch step size for which to perform validation
+    """
+
     device = get_device()
     graph_method = graph_method.value
     set_seed(seed)
@@ -84,7 +114,7 @@ def main(
     for i, run_id in enumerate(run_ids):
         # Get training data from hdf5 files
         predictions, embeddings, coords, confidence = get_raw_data(
-            project_name, run_id, x_min, y_min, width, height
+            project_dir, run_id, x_min, y_min, width, height
         )
         # Get ground truth manually annotated data
         _, _, tissue_class = get_groundtruth_patch(
@@ -112,18 +142,16 @@ def main(
         # Split nodes into unlabelled, training and validation sets. So far, validation
         # and test sets are only defined for run_id 0. If there is training data in
         # tissue_class for other runs, that data will also be used for training.
-        if run_id == 0:
+        if run_id == 1:
             data = graph_supervised.setup_node_splits(
                 data,
                 tissue_class,
-                mask_unlabelled,
+                True,
                 val_patch_files,
                 test_patch_files,
             )
         else:
-            data = graph_supervised.setup_node_splits(
-                data, tissue_class, mask_unlabelled
-            )
+            data = graph_supervised.setup_node_splits(data, tissue_class, True)
         datas.append(data)
 
     # Combine multiple graphs into a single graph

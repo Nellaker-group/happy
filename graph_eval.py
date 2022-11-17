@@ -13,14 +13,14 @@ import pandas as pd
 
 from happy.utils.utils import get_device, get_project_dir
 from happy.organs import get_organ
+from happy.utils.utils import set_seed
+from happy.graph.visualise import visualize_points
 from happy.graph.create_graph import (
     get_raw_data,
     setup_graph,
     process_knts,
     get_groundtruth_patch,
 )
-from happy.utils.utils import set_seed
-from happy.graph.visualise import visualize_points
 from happy.graph.graph_supervised import (
     inference,
     setup_node_splits,
@@ -63,7 +63,7 @@ def main(
 
     print("Begin graph construction...")
     predictions, embeddings, coords, confidence = get_raw_data(
-        project_name, run_id, x_min, y_min, width, height, verbose=verbose
+        project_dir, run_id, x_min, y_min, width, height, verbose=verbose
     )
     # Get ground truth manually annotated data
     _, _, tissue_class = get_groundtruth_patch(
@@ -128,9 +128,7 @@ def main(
 
     # Run inference and get predicted labels for nodes
     timer_start = time.time()
-    out, graph_embeddings, predicted_labels = inference(
-        model, x, eval_loader, device
-    )
+    out, graph_embeddings, predicted_labels = inference(model, x, eval_loader, device)
     timer_end = time.time()
     print(f"total time: {timer_end - timer_start:.4f} s")
 
@@ -139,9 +137,7 @@ def main(
     predicted_labels = predicted_labels[val_nodes]
     out = out[val_nodes]
     pos = pos[val_nodes]
-    tissue_class = (
-        tissue_class[val_nodes] if annot_tsv is not None else tissue_class
-    )
+    tissue_class = tissue_class[val_nodes] if annot_tsv is not None else tissue_class
 
     # Remove unlabelled (class 0) ground truth points
     if remove_unlabelled and annot_tsv is not None:
@@ -182,6 +178,7 @@ def _remove_unlabelled(tissue_class, predicted_labels, pos, out):
     out = np.delete(out, 0, axis=1)
     predicted_labels = predicted_labels[labelled_inds]
     return labelled_inds, tissue_class, predicted_labels, pos, out
+
 
 def _save_tissue_preds_as_tsv(predicted_labels, coords, save_path):
     print("Saving all tissue predictions as a tsv")

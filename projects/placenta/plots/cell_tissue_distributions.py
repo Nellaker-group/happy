@@ -10,7 +10,7 @@ from happy.organs import get_organ
 from happy.utils.utils import get_project_dir
 import happy.db.eval_runs_interface as db
 from happy.utils.hdf5 import get_datasets_in_patch, get_embeddings_file
-from projects.placenta.graphs.analysis.knot_nuclei_to_point import process_knt_cells
+from happy.graph.process_knts import process_knt_cells
 
 
 def main(
@@ -41,7 +41,7 @@ def main(
     tissue_prop_dfs = []
     for run_id in run_ids:
         # Get path to embeddings hdf5 files
-        embeddings_path = get_embeddings_file(project_name, run_id)
+        embeddings_path = get_embeddings_file(project_dir, run_id)
         # Get hdf5 datasets contained in specified box/patch of WSI
         predictions, embeddings, cell_coords, confidence = get_datasets_in_patch(
             embeddings_path, x_min, y_min, width, height

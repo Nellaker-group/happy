@@ -1,20 +1,12 @@
-from pathlib import Path
-
 import numpy as np
 import h5py
 
 import happy.db.eval_runs_interface as db
 
 
-def get_embeddings_file(project_name, run_id):
+def get_embeddings_file(project_dir, run_id):
     db.init()
-    embeddings_dir = (
-        Path(__file__).parent.parent.parent
-        / "projects"
-        / project_name
-        / "results"
-        / "embeddings"
-    )
+    embeddings_dir = project_dir / "results" / "embeddings"
     embeddings_path = db.get_embeddings_path(run_id, embeddings_dir)
     return embeddings_dir / embeddings_path
 
