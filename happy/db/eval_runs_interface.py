@@ -31,7 +31,7 @@ def get_model_weights_by_id(model_id):
     return model.architecture, model.path
 
 
-# returns an cell_infer run
+# returns an eval run
 def get_eval_run_by_id(run_id):
     eval_run = EvalRun.get_by_id(run_id)
     return eval_run

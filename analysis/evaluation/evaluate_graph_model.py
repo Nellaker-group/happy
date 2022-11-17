@@ -1,6 +1,5 @@
 from pathlib import Path
-from typing import Optional, List
-from enum import Enum
+from typing import List
 import time
 
 import typer
@@ -9,12 +8,10 @@ from torch_geometric.transforms import ToUndirected
 from torch_geometric.utils import add_self_loops
 from torch_geometric.loader import NeighborSampler
 import numpy as np
-import pandas as pd
 
 from happy.utils.utils import get_device, get_project_dir
 from happy.organs import get_organ
 from happy.utils.utils import set_seed
-from happy.graph.visualise import visualize_points
 from happy.graph.create_graph import (
     get_raw_data,
     setup_graph,
@@ -26,40 +23,52 @@ from happy.graph.graph_supervised import (
     setup_node_splits,
     evaluate,
     evaluation_plots,
+    MethodArg
 )
-
-
-class MethodArg(str, Enum):
-    k = "k"
-    delaunay = "delaunay"
-    intersection = "intersection"
 
 
 def main(
     seed: int = 0,
     project_name: str = typer.Option(...),
     organ_name: str = typer.Option(...),
-    exp_name: str = typer.Option(...),
-    model_weights_dir: str = typer.Option(...),
-    model_name: str = typer.Option(...),
+    pre_trained_path: str = typer.Option(...),
     run_id: int = typer.Option(...),
+    annot_tsv: str = typer.Option(...),
+    patch_files: List[str] = typer.Option([]),
     x_min: int = 0,
     y_min: int = 0,
     width: int = -1,
     height: int = -1,
-    val_patch_files: Optional[List[str]] = None,
     k: int = 5,
     group_knts: bool = True,
     graph_method: MethodArg = MethodArg.k,
-    remove_unlabelled: bool = True,
-    annot_tsv: Optional[str] = None,
     verbose: bool = True,
+    plot: bool = False,
 ):
+    """Evaluates model performance across validation or test datasets
+
+    seed: random seed to fix
+    project_name: name of directory containing the project
+    organ_name: name of organ
+    pre_trained_path: path relative to project to pretrained model
+    run_id: evalrun id of embeddings to evaluate over
+    annot_tsv: the name of the annotations file containing ground truth points
+    patch_files: the name of the file(s) containing validation or test patches
+    x_min: the top left x coordinate of the patch to use
+    y_min: the top left y coordinate of the patch to use
+    width: the width of the patch to use. -1 for all
+    height: the height of the patch to use. -1 for all
+    k: the value of k to use for the kNN or intersection graph
+    group_knts: whether to process KNT predictions
+    graph_method: method for constructing the graph (k, delaunay, intersection)
+    verbose: whether to print to console graph construction progress
+    plot: whether to generate evaluation plots
+    """
     set_seed(seed)
     device = get_device()
     project_dir = get_project_dir(project_name)
     organ = get_organ(organ_name)
-    patch_files = [project_dir / "graph_splits" / file for file in val_patch_files]
+    patch_files = [project_dir / "graph_splits" / file for file in patch_files]
 
     print("Begin graph construction...")
     predictions, embeddings, coords, confidence = get_raw_data(
@@ -95,16 +104,13 @@ def main(
     pos = data.pos
     x = data.x.to(device)
 
-    data = setup_node_splits(
-        data, tissue_class, remove_unlabelled, True, patch_files, verbose=verbose
-    )
+    data = setup_node_splits(data, tissue_class, True, patch_files, verbose=verbose)
     print("Graph construction complete")
 
     # Setup trained model
-    pretrained_path = (
-        project_dir / "results" / "graph" / exp_name / model_weights_dir / model_name
-    )
+    pretrained_path = project_dir / pre_trained_path
     model = torch.load(pretrained_path, map_location=device)
+    model_name = pretrained_path.parts[-1]
     model_epochs = (
         "model_final"
         if model_name == "graph_model.pt"
@@ -114,12 +120,11 @@ def main(
     # Setup paths
     save_path = (
         Path(*pretrained_path.parts[:-1])
-        / "cell_infer"
+        / "eval"
         / model_epochs
         / f"run_{run_id}"
     )
     save_path.mkdir(parents=True, exist_ok=True)
-    plot_name = f"{val_patch_files[0].split('.csv')[0]}"
 
     # Dataloader for eval, feeds in whole graph
     eval_loader = NeighborSampler(
@@ -137,37 +142,17 @@ def main(
     predicted_labels = predicted_labels[val_nodes]
     out = out[val_nodes]
     pos = pos[val_nodes]
-    tissue_class = tissue_class[val_nodes] if annot_tsv is not None else tissue_class
+    tissue_class = tissue_class[val_nodes]
 
     # Remove unlabelled (class 0) ground truth points
-    if remove_unlabelled and annot_tsv is not None:
-        unlabelled_inds, tissue_class, predicted_labels, pos, out = _remove_unlabelled(
-            tissue_class, predicted_labels, pos, out
-        )
-
-    # Evaluate against ground truth tissue annotations
-    if annot_tsv is not None:
-        evaluate(tissue_class, predicted_labels, out, organ, remove_unlabelled)
-        evaluation_plots(tissue_class, predicted_labels, organ, save_path)
-
-    # Visualise cluster labels on graph patch
-    print("Generating image")
-    colours_dict = {tissue.id: tissue.colour for tissue in organ.tissues}
-    colours = [colours_dict[label] for label in predicted_labels]
-    visualize_points(
-        organ,
-        save_path / f"{plot_name.split('.png')[0]}.png",
-        pos,
-        colours=colours,
-        width=int(data.pos[:, 0].max()) - int(data.pos[:, 0].min()),
-        height=int(data.pos[:, 1].max()) - int(data.pos[:, 1].min()),
+    unlabelled_inds, tissue_class, predicted_labels, pos, out = _remove_unlabelled(
+        tissue_class, predicted_labels, pos, out
     )
 
-    # make tsv if the whole graph was used
-    if len(data.pos) == len(data.pos[data.val_mask]):
-        label_dict = {tissue.id: tissue.label for tissue in organ.tissues}
-        predicted_labels = [label_dict[label] for label in predicted_labels]
-        _save_tissue_preds_as_tsv(predicted_labels, pos, save_path)
+    # Evaluate against ground truth tissue annotations
+    evaluate(tissue_class, predicted_labels, out, organ, True)
+    if plot:
+        evaluation_plots(tissue_class, predicted_labels, organ, save_path)
 
 
 def _remove_unlabelled(tissue_class, predicted_labels, pos, out):
@@ -178,18 +163,6 @@ def _remove_unlabelled(tissue_class, predicted_labels, pos, out):
     out = np.delete(out, 0, axis=1)
     predicted_labels = predicted_labels[labelled_inds]
     return labelled_inds, tissue_class, predicted_labels, pos, out
-
-
-def _save_tissue_preds_as_tsv(predicted_labels, coords, save_path):
-    print("Saving all tissue predictions as a tsv")
-    tissue_preds_df = pd.DataFrame(
-        {
-            "x": coords[:, 0].numpy().astype(int),
-            "y": coords[:, 1].numpy().astype(int),
-            "class": predicted_labels,
-        }
-    )
-    tissue_preds_df.to_csv(save_path / "tissue_preds.tsv", sep="\t", index=False)
 
 
 if __name__ == "__main__":

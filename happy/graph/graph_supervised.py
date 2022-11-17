@@ -1,3 +1,6 @@
+from enum import Enum
+
+
 import torch
 from sklearn.utils.class_weight import compute_class_weight
 from sklearn.metrics import (
@@ -18,6 +21,12 @@ import seaborn as sns
 from happy.train.utils import plot_confusion_matrix, get_tissue_confusion_matrix
 from happy.models.clustergcn import ClusterGCN
 from happy.graph.create_graph import get_nodes_within_tiles
+
+
+class MethodArg(str, Enum):
+    k = "k"
+    delaunay = "delaunay"
+    intersection = "intersection"
 
 
 def setup_node_splits(

@@ -77,7 +77,7 @@ def main(
             / model_type
             / exp_name
             / model_weights_dir
-            / "cell_infer"
+            / "eval"
             / model_name
             / f"run_{run_id}"
         )

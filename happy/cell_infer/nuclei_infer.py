@@ -83,7 +83,7 @@ def run_nuclei_eval(
                             pred_saver.save_empty([empty_ind])
 
                     # if there are non-empty tiles in the batch,
-                    # cell_infer model and save predictions
+                    # eval model and save predictions
                     if non_empty_inds.size > 0:
                         # filter out indices without images
                         non_empty_imgs = np.array(
