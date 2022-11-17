@@ -11,7 +11,7 @@ from happy.organs import get_organ
 from happy.utils.utils import get_project_dir
 import happy.db.eval_runs_interface as db
 from happy.utils.hdf5 import get_datasets_in_patch, get_embeddings_file
-from projects.placenta.graphs.analysis.knot_nuclei_to_point import process_knt_cells
+from happy.graph.process_knts import process_knt_cells
 
 
 def main(

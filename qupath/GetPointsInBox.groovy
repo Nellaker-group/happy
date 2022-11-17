@@ -9,7 +9,7 @@ def slideName = getCurrentServer().getPath().split("/")[-1]
 def slideNumber = slideName.split("-")[0]
 
 def fileName = slideNumber + "_from_groovy.csv"
-def saveDir = "/Users/claud/code/py/happy/projects/placenta/results/annotation_csvs/" + fileName
+def saveDir = "/../projects/placenta/results/annotation_csvs/" + fileName
 
 // Get all manually annotated box areas
 def allBoxAnnot = getAnnotationObjects().findAll({ it.getPathClass().getName() == "TAnnot" })

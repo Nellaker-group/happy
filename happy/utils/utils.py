@@ -1,12 +1,19 @@
 import time
 from collections import OrderedDict
 from pathlib import Path
+import random
 
 import GPUtil
 import numpy as np
 import skimage.color
 import skimage.io
 import torch
+
+
+def set_seed(seed):
+    torch.manual_seed(seed)
+    random.seed(seed)
+    np.random.seed(seed)
 
 
 def set_gpu_device():
@@ -71,3 +78,14 @@ def process_image(img):
 def load_image(image_path):
     img = skimage.io.imread(image_path)
     return process_image(img)
+
+
+def send_graph_to_device(data, device, tissue_class=None):
+    x, edge_index = data.x.to(device), data.edge_index.to(device)
+    if not tissue_class is None:
+        tissue_class = torch.Tensor(tissue_class).type(torch.LongTensor).to(device)
+    return x, edge_index, tissue_class
+
+
+def save_model(model, save_path):
+    torch.save(model, save_path)

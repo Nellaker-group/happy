@@ -9,7 +9,7 @@ def slideName = getCurrentServer().getPath().split("/")[-1]
 def slideNumber = slideName.split("-")[0]
 
 def fileName = slideNumber + "_tissue_points.csv"
-def saveDir = "/Users/claud/code/py/happy/projects/placenta/results/tissue_annots/" + fileName
+def saveDir = "/../projects/placenta/results/tissue_annots/" + fileName
 
 // Get all manual annotations of tissue regions
 allTissueAnnot = [:]
