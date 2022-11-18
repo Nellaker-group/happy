@@ -33,7 +33,7 @@ def main(
         organ_name: name of organ for getting the cells
         annot_dir: relative path to annotations
         pre_trained: relative path to pretrained model
-        dataset_names: the datasets who's validation set to evaluate over
+        dataset_names: the datasets' validation set to evaluate over
         plot_cm: whether to plot the confusion matrix
         use_test_set: whether to use the test set for validation
     """

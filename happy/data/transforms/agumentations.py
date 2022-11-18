@@ -7,8 +7,18 @@ from happy.data.transforms.utils.color_conversion import he2rgb, rgb2he
 
 
 class AlbAugmenter(object):
-    def __init__(self, list_of_albumentations, bboxes=True):
+    def __init__(
+        self,
+        list_of_albumentations,
+        prgn=42,
+        min_area=0.0,
+        min_visibility=0.0,
+        bboxes=True,
+    ):
         self.list_of_albumentations = list_of_albumentations
+        self.prgn = prgn
+        self.min_area = min_area
+        self.min_visibility = min_visibility
         self.bboxes = bboxes
 
     def __call__(self, sample):

@@ -16,14 +16,14 @@ import happy.db.eval_runs_interface as db
 
 
 # Load model weights and push to device
-def setup_model(model_id, device):
+def setup_model(project_dir, model_id, device):
     model_architecture, model_weights_path = db.get_model_weights_by_id(model_id)
-    print(f"model pre_trained path: {model_weights_path}")
+    print(f"model pre_trained path: {project_dir / model_weights_path}")
     if model_architecture == "retinanet":
         model = retinanet.build_retina_net(
             num_classes=1, device=device, pretrained=False, resnet_depth=101
         )
-        state_dict = torch.load(model_weights_path)
+        state_dict = torch.load(project_dir / model_weights_path)
         # Removes the module string from the keys if it's there.
         model = load_weights(state_dict, model)
     else:
@@ -83,7 +83,7 @@ def run_nuclei_eval(
                             pred_saver.save_empty([empty_ind])
 
                     # if there are non-empty tiles in the batch,
-                    # cell_infer model and save predictions
+                    # eval model and save predictions
                     if non_empty_inds.size > 0:
                         # filter out indices without images
                         non_empty_imgs = np.array(

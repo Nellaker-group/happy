@@ -1,5 +1,6 @@
 from torch.utils.data.sampler import BatchSampler, WeightedRandomSampler
 from torch.utils.data import DataLoader
+from torch_geometric.loader import ClusterData, ClusterLoader, NeighborSampler
 
 from happy.data.samplers import GroupSampler
 from happy.data.transforms.collaters import cell_collater, collater
@@ -49,3 +50,16 @@ def get_dataloader(split, dataset, collater, num_workers, nuclei, batch_size):
     return DataLoader(
         dataset, num_workers=num_workers, collate_fn=collater, batch_sampler=sampler
     )
+
+
+def setup_graph_dataloaders(data, batch_size, num_neighbors):
+    cluster_data = ClusterData(
+        data, num_parts=int(data.x.size()[0] / num_neighbors), recursive=False
+    )
+    train_loader = ClusterLoader(
+        cluster_data, batch_size=batch_size, shuffle=True, num_workers=12
+    )
+    val_loader = NeighborSampler(
+        data.edge_index, sizes=[-1], batch_size=1024, shuffle=False, num_workers=12
+    )
+    return train_loader, val_loader
