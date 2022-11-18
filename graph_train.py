@@ -35,7 +35,7 @@ def main(
     k: int = 5,
     group_knts: bool = True,
     pretrained: Optional[str] = None,
-    graph_method: MethodArg = MethodArg.k,
+    graph_method: MethodArg = MethodArg.intersection,
     batch_size: int = 200,
     num_neighbours: int = 400,
     epochs: int = 2000,
@@ -49,7 +49,7 @@ def main(
     annot_tsvs: List[str] = typer.Option([]),
     val_patch_files: List[str] = typer.Option([]),
     test_patch_files: Optional[List[str]] = typer.Option([]),
-    validation_step: int = 25,
+    validation_step: int = 100,
 ):
     """Train a ClusterGCN model by constructing a graph on the saved cell embeddings.
 

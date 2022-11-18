@@ -25,7 +25,7 @@ def main(
         project_name: name of the project dir to save visualisations to
         annot_dir: relative path to annotations
         pre_trained: relative path to pretrained model
-        dataset_names: the datasets who's validation set to evaluate over
+        dataset_names: the datasets' validation set to evaluate over
         score_threshold: the confidence threshold below which to discard predictions
         max_detections: number of maximum detections to save, ordered by score
         valid_distance: distance to gt in pixels for which a prediction is valid

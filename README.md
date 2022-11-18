@@ -56,42 +56,154 @@ Organ-specific cell and tissue data may be added to `happy/organs.py`. We recomm
 extending the core happy code by adding a new project to `projects/{project_name}`, 
 using `projects/placenta` as a template.
 
-If you would like to use the placenta histology data from the paper, you may download
-the data from [this link](https://drive.google.com/drive/folders/1RvSQOxsWyUHf_SGV1Jzqa_Gc5QI4wQoy?usp=sharing). 
+If you would like to use the placenta histology training data from the paper, you may 
+download the data from [this link](https://drive.google.com/drive/folders/1RvSQOxsWyUHf_SGV1Jzqa_Gc5QI4wQoy?usp=sharing). 
 Keeping the same directory structure as in the link, place each directory into 
 `projects/placenta`. This will allow you to train and evaluate all three models. For
 WSI inference, we supply a section of a WSI for demonstration purposes under 
-`projects/placenta/slides`.
+`projects/placenta/slides/sample_wsi.tif`. We explain how to run the full 
+inference pipeline across this WSI in the 3rd section.
 
 ## Training
 
 ### Nuclei Detection Training
 
+Placenta nuclei detection training data from the paper may be found under 
+`projects/placenta/datasets/nuclei/` with annotations in 
+`projects/placenta/annotations/nuclei/`. This data is split into respective data 
+collection sources (i.e. 'hmc' and 'uot1') which are combined during training.
+
+To train the nuclei detection model, run:
+
+```bash
+python nuc_train.py --project_name placenta --exp-name demo-train --annot-dir annotations/nuclei --dataset-names hmc --dataset-names uot1 --dataset-names uot2 --dataset-names uot3 --dataset-names empty --decay-gamma 0.5 --init-from-inc --frozen
+```
+
+We recommend first fine tuning the model pretrained on the coco dataset using commands
+`--frozen --init-from-inc`. Then loading the fine tuned model and training 
+unfrozen using `--pre-trained {path} --no-frozen --no-init-from-inc`.
+
 ### Cell Classification Training
+
+Placenta cell classification training data from the paper may be found under 
+`projects/placenta/datasets/cell_class/` with annotations in 
+`projects/placenta/annotations/cell_class/`. This data is split into respective data 
+collection sources (i.e. 'hmc' and 'uot1') which are combined during training.
+
+To train the cell classification model, run:
+
+```bash
+python cell_train.py --project_name placenta --organ-name placenta --exp-name demo-train --annot-dir annotations/cell_class --dataset-names hmc --dataset-names uot1 --dataset-names uot2 --dataset-names uot3 --decay-gamma 0.5 --init-from-inc --frozen
+```
+
+As with the nuclei detection model, we recommend first fine tuning the model pretrained 
+on the imagenet dataset using commands `--frozen --init-from-inc`. Then loading the 
+fine tuned model and training unfrozen using 
+`--pre-trained {path} --no-frozen --no-init-from-inc`.
 
 ### Tissue Classification Training
 
+By default, the training script will mask any nodes that are within the regions 
+specified by validation and/or test .csv files within `graph_splits/` as validation
+and/or test nodes. All other nodes will be marked as training nodes.  
+
+We provide the training data and ground truth annotations for training the graph model 
+across the cell graphs of two placenta WSIs, as per the paper. The training data is 
+found under `projects/placenta/embeddings/` and the ground truth annotations are found 
+under `projects/placenta/annotations/graph`.
+
+To train the graph tissue model on this data, run:
+
+```bash
+python graph_train.py --project-name placenta --organ-name placenta --run-ids 1 --run-ids 2 --annot-tsvs wsi_1.tsv --annot-tsvs wsi_2.tsv --exp-name demo_train --val-patch-files val_patches.csv --test-patch-files test_patches.csv
+```
+
 ### Making Custom Training Data
 
+We provide utility scripts for generating your own training data. 
 
+**Nuclei Detection and Cell Classification:**
+If you have used QuPath to create cell point annotations within boxes, you may use 
+`qupath/GetPointsInBox.groovy` to extract a .csv of these ground truth points and
+classes. From this .csv, you may use `happpy/microscopefile/make_tile_dataset.py` to
+generate a dataset of tile images and train/val/test split annotation files from your
+annotations for both nuclei detection and cell classification. 
+
+**Tissue Classification:** In Qupath, if you load nuclei predictions onto your desired
+WSI and draw polygon boundaries around different structures, you may use 
+`qupath/cellPointsToTissues.groovy` to extract those points with ground truth tissue
+labels. 
 
 ## Evaluation
 
-### Nuclei Detection Evaluation
-
-### Cell Classification Evaluation
-
-### Tissue Classification Evaluation
+We provide evaluation scripts for checking model performance on validation or test 
+data for each of the three models under `analysis/evaluation/`. The nuclei detection
+model can be evaluated using `evaluate_nuclei_model.py`, the cell classification model 
+can be evaluated using `evaluate_cell_model.py`, and the graph tissue model can be
+evaluated using `evaluate_graph_model.py`.
 
 ## WSI Inference Pipeline
 
 ### Adding WSIs to the Database
 
+You may add WSIs to the database using `happy/db/add_slides.py`. This will add all
+slides with the specified file format at the specified directory to the database. We 
+supply a starting database in github which contains two entries in the Slide and 
+EvalRun tables to allow for training and evaluation of the graph model, as per the 
+paper. 
+
 ### Adding Trained Models to the Database
+
+You may add trained models to the database using `happy/db/add_model.py`. The sample 
+starting database in github already contains data for both pretrained nuclei and 
+cell models from the paper. They have model IDs 1 and 2 respectively.
 
 ### Cell Pipeline
 
+The cell pipeline `cell_inference.py` will run both nuclei detection and cell 
+classification across a WSI. It will save each 'run' over a WSI into the Evalruns table 
+in the database with respective predictions in the Predictions table. 
+Each run can be stopped and restarted at any time. See the demo below for an example.
+
+You may extract nuclei and cell predictions into a .tsv which QuPath can read using 
+`qupath/coord_to_tsv.py`.
+
 ### Tissue Pipeline
+
+Once you have nuclei and cell predictions, you may run the tissue pipeline 
+`graph_inference.py`. This will construct a cell graph across the WSI and run the 
+graph model. The pipeline will save a visualisation of tissue predictions and a .tsv 
+file containing these predictions at the location of the trained model. See the demo
+below for an example. 
+
+### Demo Walkthrough
+
+<img src="readme_images/demo_sample.png" width="300" align="right" />
+
+Add the demo slide section contained in `projects/placenta/slides/sample_wsi.tif` to 
+the database using:
+
+```bash
+CWD=$(pwd) # save absolute current working directory
+python happy/db/add_slides.py --slides-dir "$CWD/projects/placenta/slides/" --lab-country na --primary-contact na --slide-file-format .tif --pixel-size 0.2277 
+```
+
+Run the nuclei and cell inference pipeline on this sample:
+
+```bash
+python cell_inference.py --project-name placenta --organ-name placenta --nuc-model-id 1 --cell-model-id 2 --slide-id 3 
+```
+
+Run the graph tissue inference pipeline on the nuclei and cell predictions:
+
+```bash
+python graph_inference.py --project-name placenta --organ-name placenta --run-id 3 
+```
+
+At the location of the graph model weights, you will find an `eval` directory which will
+contain a visualisation of the tissue predictions and a .tsv file containing the 
+predictions, which can be loaded into QuPath. In this case, these will be under 
+`projects/placenta/trained_models/eval/`
 
 ## Visualisation
 

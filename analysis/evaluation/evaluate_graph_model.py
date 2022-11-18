@@ -23,7 +23,7 @@ from happy.graph.graph_supervised import (
     setup_node_splits,
     evaluate,
     evaluation_plots,
-    MethodArg
+    MethodArg,
 )
 
 
@@ -35,13 +35,9 @@ def main(
     run_id: int = typer.Option(...),
     annot_tsv: str = typer.Option(...),
     patch_files: List[str] = typer.Option([]),
-    x_min: int = 0,
-    y_min: int = 0,
-    width: int = -1,
-    height: int = -1,
     k: int = 5,
     group_knts: bool = True,
-    graph_method: MethodArg = MethodArg.k,
+    graph_method: MethodArg = MethodArg.intersection,
     verbose: bool = True,
     plot: bool = False,
 ):
@@ -54,10 +50,6 @@ def main(
     run_id: evalrun id of embeddings to evaluate over
     annot_tsv: the name of the annotations file containing ground truth points
     patch_files: the name of the file(s) containing validation or test patches
-    x_min: the top left x coordinate of the patch to use
-    y_min: the top left y coordinate of the patch to use
-    width: the width of the patch to use. -1 for all
-    height: the height of the patch to use. -1 for all
     k: the value of k to use for the kNN or intersection graph
     group_knts: whether to process KNT predictions
     graph_method: method for constructing the graph (k, delaunay, intersection)
@@ -72,17 +64,11 @@ def main(
 
     print("Begin graph construction...")
     predictions, embeddings, coords, confidence = get_raw_data(
-        project_dir, run_id, x_min, y_min, width, height, verbose=verbose
+        project_dir, run_id, 0, 0, -1, -1, verbose=verbose
     )
     # Get ground truth manually annotated data
     _, _, tissue_class = get_groundtruth_patch(
-        organ,
-        project_dir,
-        x_min,
-        y_min,
-        width,
-        height,
-        annot_tsv,
+        organ, project_dir, 0, 0, -1, -1, annot_tsv
     )
     # Covert isolated knts into syn and turn groups into a single knt point
     if group_knts:
@@ -119,10 +105,7 @@ def main(
 
     # Setup paths
     save_path = (
-        Path(*pretrained_path.parts[:-1])
-        / "eval"
-        / model_epochs
-        / f"run_{run_id}"
+        Path(*pretrained_path.parts[:-1]) / "eval" / model_epochs / f"run_{run_id}"
     )
     save_path.mkdir(parents=True, exist_ok=True)
 

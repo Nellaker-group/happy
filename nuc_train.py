@@ -25,7 +25,7 @@ def main(
     step_size: int = 20,
     init_from_inc: bool = False,
     frozen: bool = True,
-    vis: bool = True,
+    vis: bool = False,
     get_cuda_device_num: bool = False,
 ):
     """For training a nuclei detection model

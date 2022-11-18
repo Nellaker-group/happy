@@ -32,7 +32,7 @@ def main(
     height: int = -1,
     k: int = 5,
     group_knts: bool = True,
-    graph_method: MethodArg = MethodArg.k,
+    graph_method: MethodArg = MethodArg.intersection,
     verbose: bool = True,
 ):
     """Generates a visualisation of the graph model predictions for the specified
