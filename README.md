@@ -1,14 +1,26 @@
-# Histology Analysis Pipeline.py (HAPPY)
+# Histology Analysis Pipeline.py (HAPPY) <img src="readme_images/HAPPYPlacenta.png" width="100" align="right" />
 
 ## Overview
 
-Accompanying repository for *HAPPY: A deep learning pipeline for mapping cell-to-tissue 
-graphs across placenta histology whole slide images*.
+Accompanying repository for **HAPPY: A deep learning pipeline for mapping cell-to-tissue 
+graphs across placenta histology whole slide images**. 
+
+<img src="readme_images/Figure1.png" width="490" align="right" />
+
+**Abstract**: _We present the ‘Histology Analysis Pipeline.PY’ (HAPPY), a hierarchical 
+method for quantifying the variability of cells and micro-anatomical tissue structures 
+across placenta histology whole slide images. In contrast to commonly used high-level 
+patch features or segmentation approaches, HAPPY follows an interpretable biological 
+hierarchy. It is an end-to-end pipeline able to represent cells and communities of 
+cells within tissues at a single-cell resolution across whole slide images. Here we 
+present a set of quantitative metrics from healthy term placentas as a baseline for 
+future assessments of placenta health. HAPPY cell and tissue predictions closely 
+replicate those from independent clinical experts and the placenta biology literature._
 
 This repo contains all code for training, evaluating, and running inference across 
 WSIs using the three stage deep learning pipeline detailed in the paper. The three 
-deep learning steps are: nuclei detection, cell classification and tissue 
-classification.
+deep learning steps are: **nuclei detection**, **cell classification** and **tissue 
+classification**.
 
 ## Installation
 
@@ -47,7 +59,9 @@ using `projects/placenta` as a template.
 If you would like to use the placenta histology data from the paper, you may download
 the data from [this link](https://drive.google.com/drive/folders/1RvSQOxsWyUHf_SGV1Jzqa_Gc5QI4wQoy?usp=sharing). 
 Keeping the same directory structure as in the link, place each directory into 
-`projects/placenta`.
+`projects/placenta`. This will allow you to train and evaluate all three models. For
+WSI inference, we supply a section of a WSI for demonstration purposes under 
+`projects/placenta/slides`.
 
 ## Training
 
@@ -56,6 +70,10 @@ Keeping the same directory structure as in the link, place each directory into
 ### Cell Classification Training
 
 ### Tissue Classification Training
+
+### Making Custom Training Data
+
+
 
 ## Evaluation
 
