@@ -24,10 +24,13 @@ classification**.
 
 ## Installation
 
-Our codebase is writen in python=3.7.2. 
+Our codebase is writen in python=3.7.2.
 
 We recommend installation from source using the MakeFile which will install all 
-requirements:
+requirements. Installation should only take a few minutes. 
+
+This has been tested on: Ubuntu 20.04.2 (WSL2), MacOS 11.1, and CentOS 7.9.2009 using 
+both an NVIDIA A100 GPU and a CPU.
 
 ```bash
 git clone git@github.com:Nellaker-group/happy.git
