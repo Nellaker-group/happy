@@ -24,17 +24,29 @@ classification**.
 
 ## Installation
 
-Our codebase is writen in python=3.7.2.
+Our codebase is writen in python=3.7.2 and has been tested on Ubuntu 20.04.2 (WSL2), 
+MacOS 11.1, and CentOS 7.9.2009 using both an NVIDIA A100 GPU and a CPU
 
-We recommend installation from source using the MakeFile which will install all 
-requirements. Installation should only take a few minutes. 
+You will first need to install the vips C binaries. The libvips documentation lists
+installation instructions [here](https://github.com/libvips/libvips/wiki) for different 
+OSs. If you are using MacOS you may brew install with:
 
-This has been tested on: Ubuntu 20.04.2 (WSL2), MacOS 11.1, and CentOS 7.9.2009 using 
-both an NVIDIA A100 GPU and a CPU.
+```bash
+brew install vips --with-cfitsio --with-imagemagick --with-openexr --with-openslide --with-webp
+```
+
+If you are on Ubuntu you may apt get:
+
+```bash
+sudo apt install libvips
+```
+
+For all remaining Python source code and dependencies, we recommend installation 
+using the MakeFile. Installation should only take a few minutes.
 
 ```bash
 git clone git@github.com:Nellaker-group/happy.git
-cd placenta
+cd happy
 # Activate conda or venv environment with python installation:
 # e.g. conda create -y -n happy python=3.7.2
 #      conda activate happy
@@ -51,6 +63,25 @@ pip install -e .
 ```
 If you would rather install a different version of pytorch for your cuda version, 
 please change the first two lines as per library instructions.
+
+### Troubleshooting
+
+Installing javabridge can sometimes be a little tricky on MacOS. If you get a 
+'jvm not found' or 'jni.h not found' style error then you need to locate your 
+java installation and export it. For example, if you installed java with homebrew you 
+can:
+
+```bash
+export JAVA_HOME=/usr/local/opt/openjdk
+```
+
+If you then get a error with 'module = PyImport_ImportModuleLevelObject' you can 
+install this fork of javabridge which fixes it:
+
+```bash
+pip install git+https://github.com/LeeKamentsky/python-javabridge.git#egg=javabridge
+```
+
 
 ## Project Setup
 
