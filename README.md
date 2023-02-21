@@ -7,15 +7,19 @@ graphs across placenta histology whole slide images**.
 
 <img src="readme_images/Figure1.png" width="490" align="right" />
 
-**Abstract**: _We present the ‘Histology Analysis Pipeline.PY’ (HAPPY), a hierarchical 
-method for quantifying the variability of cells and micro-anatomical tissue structures 
-across placenta histology whole slide images. In contrast to commonly used high-level 
-patch features or segmentation approaches, HAPPY follows an interpretable biological 
-hierarchy. It is an end-to-end pipeline able to represent cells and communities of 
-cells within tissues at a single-cell resolution across whole slide images. Here we 
-present a set of quantitative metrics from healthy term placentas as a baseline for 
-future assessments of placenta health. HAPPY cell and tissue predictions closely 
-replicate those from independent clinical experts and the placenta biology literature._
+**Abstract**: _Accurate placenta pathology assessment is essential for managing maternal 
+and newborn health, but the placenta's heterogeneity and temporal variability pose 
+challenges for histology analysis. To address this issue, we developed the 
+‘Histology Analysis Pipeline.PY’ (HAPPY), a deep learning hierarchical method for 
+quantifying the variability of cells and micro-anatomical tissue structures across 
+placenta histology whole slide images. HAPPY differs from patch-based features or 
+segmentation approaches by following an interpretable biological hierarchy, representing 
+cells and cellular communities within tissues at a single-cell resolution across whole 
+slide images. We present a set of quantitative metrics from healthy term placentas as a 
+baseline for future assessments of placenta health and we show how these metrics deviate 
+in placentas with clinically significant placental infarction. HAPPY’s cell and tissue 
+predictions closely replicate those from independent clinical experts and placental 
+biology literature._
 
 This repo contains all code for training, evaluating, and running inference across 
 WSIs using the three stage deep learning pipeline detailed in the paper. The three 
