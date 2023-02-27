@@ -204,7 +204,7 @@ python cell_inference.py --project-name placenta --organ-name placenta --nuc-mod
 Run the graph tissue inference pipeline on the nuclei and cell predictions:
 
 ```bash
-python graph_inference.py --project-name placenta --organ-name placenta --run-id 3 
+python graph_inference.py --project-name placenta --organ-name placenta --pre-trained-path trained_models/graph_model.pt --run-id 3 
 ```
 
 At the location of the graph model weights, you will find an `eval` directory which will
