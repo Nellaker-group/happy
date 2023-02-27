@@ -198,7 +198,7 @@ python happy/db/add_slides.py --slides-dir "$CWD/projects/placenta/slides/" --la
 Run the nuclei and cell inference pipeline on this sample:
 
 ```bash
-python cell_inference.py --project-name placenta --organ-name placenta --nuc-model-id 1 --cell-model-id 2 --slide-id 3 
+python cell_inference.py --project-name placenta --organ-name placenta --nuc-model-id 1 --cell-model-id 2 --slide-id 3 --cell-batch-size 100
 ```
 
 Run the graph tissue inference pipeline on the nuclei and cell predictions:

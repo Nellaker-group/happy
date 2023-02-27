@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from torch.utils.data import IterableDataset
 
-from utils.utils import process_image
+from happy.utils.utils import process_image
 
 
 class MSDataset(IterableDataset, ABC):
