@@ -182,6 +182,10 @@ class Libvips(Reader):
     def max_slide_height(self):
         return self.reader.get("height")
 
+    @property
+    def region(self):
+        return pyvips.Region.new(self.reader)
+
     def get_pixel_size(self, pixel_size):
         """Try to get the pixel size dimensions out of the metadata"""
         try:
@@ -203,8 +207,7 @@ class Libvips(Reader):
             bounded_w = min(w, self.max_slide_width - x)
             bounded_h = min(h, self.max_slide_height - y)
 
-        region = pyvips.Region.new(self.reader)
-        avail_img = region.fetch(x, y, bounded_w, bounded_h)
+        avail_img = self.region.fetch(x, y, bounded_w, bounded_h)
 
         full_img = np.ndarray(
             buffer=avail_img,
