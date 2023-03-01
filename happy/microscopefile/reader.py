@@ -212,7 +212,7 @@ class Libvips(Reader):
         full_img = np.ndarray(
             buffer=avail_img,
             dtype=np.uint8,
-            shape=[bounded_h, bounded_w, 3],
+            shape=[bounded_h, bounded_w, self.reader.bands],
         )[:, :, 0:3]
 
         return full_img
