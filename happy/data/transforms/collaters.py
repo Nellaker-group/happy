@@ -11,16 +11,17 @@ def cell_collater(batch):
     # take all possible keys
     sample_dict = {}
     for key in batch[0].keys():
-        sample_dict[key] = [data[key] for data in batch]
+        if key is not "img" or key is not "annot":
+            sample_dict[key] = [data[key] for data in batch]
 
-    imgs = [data["img"] for data in batch]
-    annots = [data["annot"] for data in batch]
+    imgs = np.array([data["img"] for data in batch])
+    annots = np.array([data["annot"] for data in batch])
 
     # (batch, channel, x, y) for resnet that's (100, 224, 244, 3)
-    transposed_imgs = [np.transpose(img, axes=[2, 1, 0]) for img in imgs]
-    tensor_imgs = torch.LongTensor(np.array(transposed_imgs))
+    transposed_imgs = np.transpose(imgs, axes=[0, 3, 2, 1])
 
-    sample_dict.update({"img": tensor_imgs, "annot": torch.LongTensor(annots)})
+    sample_dict["img"] = torch.LongTensor(transposed_imgs)
+    sample_dict["annot"] = torch.LongTensor(annots)
 
     return sample_dict
 

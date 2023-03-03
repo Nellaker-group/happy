@@ -182,6 +182,10 @@ class Libvips(Reader):
     def max_slide_height(self):
         return self.reader.get("height")
 
+    @property
+    def region(self):
+        return pyvips.Region.new(self.reader)
+
     def get_pixel_size(self, pixel_size):
         """Try to get the pixel size dimensions out of the metadata"""
         try:
@@ -195,7 +199,6 @@ class Libvips(Reader):
             return pixel_size
 
     def get_img(self, x, y, w, h, bound=True):
-        full_img = np.zeros((h, w, 3))
         bounded_w = w
         bounded_h = h
         x = int(min(self.max_slide_width - 1, x))
@@ -204,31 +207,14 @@ class Libvips(Reader):
             bounded_w = min(w, self.max_slide_width - x)
             bounded_h = min(h, self.max_slide_height - y)
 
-        format_to_dtype = {
-            "uchar": np.uint8,
-            "char": np.int8,
-            "ushort": np.uint16,
-            "short": np.int16,
-            "uint": np.uint32,
-            "int": np.int32,
-            "float": np.float32,
-            "double": np.float64,
-            "complex": np.complex64,
-            "dpcomplex": np.complex128,
-        }
+        avail_img = self.region.fetch(x, y, bounded_w, bounded_h)
 
-        avail_img = self.reader.crop(x, y, bounded_w, bounded_h)
-        avail_img = np.ndarray(
-            buffer=avail_img.write_to_memory(),
-            dtype=format_to_dtype[avail_img.format],
-            shape=[avail_img.height, avail_img.width, avail_img.bands],
+        full_img = np.ndarray(
+            buffer=avail_img,
+            dtype=np.uint8,
+            shape=[bounded_h, bounded_w, self.reader.bands],
         )[:, :, 0:3]
 
-        np.add(
-            full_img[:bounded_h, :bounded_w],
-            avail_img,
-            out=full_img[:bounded_h, :bounded_w],
-        )
         return full_img
 
 
