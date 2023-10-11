@@ -20,15 +20,12 @@ def main(
     model_weights_dir: str = typer.Option(...),
     model_name: str = typer.Option(...),
     model_type: str = "sup_clustergcn",
-    x_min: int = 0,
-    y_min: int = 0,
-    width: int = -1,
-    height: int = -1,
     group_knts: bool = False,
     trained_with_grouped_knts: bool = False,
+    include_counts: bool = False,
 ):
     """Plot the distribution of cell and tissue types across multiple WSIs.
-    This will plot a line plot with an offset swarm plot where each point is each WSI.
+    This will plot a box and whisker a swarm plot where each point is each WSI.
     """
 
     # Create database connection
@@ -38,13 +35,15 @@ def main(
     project_dir = get_project_dir(project_name)
 
     cell_prop_dfs = []
+    cell_counts_df = []
     tissue_prop_dfs = []
+    tissue_counts_df = []
     for run_id in run_ids:
         # Get path to embeddings hdf5 files
         embeddings_path = get_embeddings_file(project_dir, run_id)
         # Get hdf5 datasets contained in specified box/patch of WSI
         predictions, embeddings, cell_coords, confidence = get_datasets_in_patch(
-            embeddings_path, x_min, y_min, width, height
+            embeddings_path, 0, 0, -1, -1
         )
 
         if group_knts:
@@ -68,6 +67,40 @@ def main(
         ]
         unique_cell_proportions = dict(zip(unique_cell_labels, cell_proportions))
         cell_prop_dfs.append(pd.DataFrame([unique_cell_proportions]))
+
+        if include_counts:
+            # calculate the area using the tiles containing nuclei to get cells per area
+            tile_coords = np.array(db.get_run_state(run_id))
+            tile_width = tile_coords[tile_coords[:, 1].argmax() + 1][0]
+            tile_height = tile_coords[1][1]
+            xs = cell_coords[:, 0]
+            ys = cell_coords[:, 1]
+
+            # count how many tiles have at least one cell
+            tile_count = 0
+            for tile in tile_coords:
+                tile_x = tile[0]
+                tile_y = tile[1]
+
+                mask = np.logical_and(
+                    (np.logical_and(xs >= tile_x, (ys >= tile_y))),
+                    (
+                        np.logical_and(
+                            xs <= (tile_x + tile_width), (ys <= (tile_y + tile_height))
+                        )
+                    ),
+                )
+                if np.any(mask):
+                    tile_count += 1
+            print(f"Number of tiles with a least one cell: {tile_count}")
+            tile_area = tile_count * tile_width * tile_height
+            slide_pixel_size = db.get_slide_pixel_size_by_evalrun(run_id)
+            tile_area = tile_area * slide_pixel_size * slide_pixel_size
+            print(f"Tile area in um^2: {tile_area}")
+
+            cell_counts = [count / tile_area * 1000000 for count in cell_counts]
+            all_cell_counts = dict(zip(unique_cell_labels, cell_counts))
+            cell_counts_df.append(pd.DataFrame([all_cell_counts]))
 
         # print tissue predictions from tsv file
         pretrained_path = (
@@ -99,17 +132,24 @@ def main(
         unique_tissue_proportions = dict(zip(unique_tissues, tissue_proportions))
         tissue_prop_dfs.append(pd.DataFrame([unique_tissue_proportions]))
 
+        if include_counts:
+            tissue_counts = [count / tile_area * 1000000 for count in tissue_counts]
+            all_tissue_counts = dict(zip(unique_tissues, tissue_counts))
+            tissue_counts_df.append(pd.DataFrame([all_tissue_counts]))
+
     cell_df = pd.concat(cell_prop_dfs)
     args_to_sort = np.argsort([cell.structural_id for cell in organ.cells])
     cell_df = cell_df[cell_df.columns[args_to_sort]]
     cell_colours = {cell.name: cell.colour for cell in organ.cells}
 
+    if include_counts:
+        cell_counts_df = pd.concat(cell_counts_df)
+        cell_counts_df = cell_counts_df[cell_counts_df.columns[args_to_sort]]
+        cell_counts_df["Total"] = cell_counts_df[list(cell_counts_df.columns)].sum(
+            axis=1
+        )
+
     tissue_df = pd.concat(tissue_prop_dfs)
-    tissue_labels = [tissue.name for tissue in organ.tissues]
-    args_to_sort = [
-        np.where(tissue_df.columns.to_numpy() == np.array(tissue_labels)[:, None])[1]
-    ]
-    tissue_df = tissue_df[tissue_df.columns[args_to_sort]]
     tissue_df = tissue_df[
         [
             "Terminal Villi",
@@ -125,10 +165,34 @@ def main(
     ]
     tissue_colours = {tissue.name: tissue.colour for tissue in organ.tissues}
 
+    if include_counts:
+        tissue_counts_df = pd.concat(tissue_counts_df)
+        tissue_df = tissue_df[
+            [
+                "Terminal Villi",
+                "Mature Intermediate Villi",
+                "Stem Villi",
+                "Villus Sprout",
+                "Anchoring Villi",
+                "Chorionic Plate",
+                "Basal Plate/Septum",
+                "Fibrin",
+                "Avascular Villi",
+            ]
+        ]
+        tissue_counts_df["Total"] = tissue_counts_df[
+            list(tissue_counts_df.columns)
+        ].sum(axis=1)
+        tissue_colours["Total"] = "#000000"
+
     plot_box_and_whisker(cell_df, "plots/cell_proportions.png", "Cell", cell_colours)
+    plot_box_and_whisker(cell_counts_df, "plots/cell_counts.png", "Cell", cell_colours)
 
     plot_box_and_whisker(
         tissue_df, "plots/tissue_proportions.png", "Tissue", tissue_colours
+    )
+    plot_box_and_whisker(
+        tissue_counts_df, "plots/tissue_counts.png", "Tissue", tissue_colours
     )
 
 

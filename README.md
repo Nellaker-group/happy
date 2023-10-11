@@ -63,11 +63,11 @@ Organ-specific cell and tissue data may be added to `happy/organs.py`. We recomm
 extending the core happy code by adding a new project to `projects/{project_name}`, 
 using `projects/placenta` as a template.
 
-If you would like to use the placenta histology training data from the paper, you may 
-download the data from [this link](https://drive.google.com/drive/folders/1RvSQOxsWyUHf_SGV1Jzqa_Gc5QI4wQoy?usp=sharing). 
+If you would like to use the placenta histology training data and trained models from 
+the paper, you may download the data from [this link](https://drive.google.com/drive/folders/1RvSQOxsWyUHf_SGV1Jzqa_Gc5QI4wQoy?usp=sharing). 
 Keeping the same directory structure as in the link, place each directory into 
 `projects/placenta`. This will allow you to train and evaluate all three models. For
-WSI inference, we supply a section of a WSI for demonstration purposes under 
+a WSI inference demo, place the sample WSI section under 
 `projects/placenta/slides/sample_wsi.tif`. We explain how to run the full 
 inference pipeline across this WSI in the 3rd section.
 
@@ -75,10 +75,10 @@ inference pipeline across this WSI in the 3rd section.
 
 ### Nuclei Detection Training
 
-Placenta nuclei detection training data from the paper may be found under 
+Placenta nuclei detection training data from the paper should be placed under 
 `projects/placenta/datasets/nuclei/` with annotations in 
 `projects/placenta/annotations/nuclei/`. This data is split into respective data 
-collection sources (i.e. 'hmc' and 'uot1') which are combined during training.
+collection sources (i.e. 'hmc', 'uot1', 'nuh') which are combined during training.
 
 To train the nuclei detection model, run:
 
@@ -92,7 +92,7 @@ unfrozen using `--pre-trained {path} --no-frozen --no-init-from-inc`.
 
 ### Cell Classification Training
 
-Placenta cell classification training data from the paper may be found under 
+Placenta cell classification training data from the paper should be placed under 
 `projects/placenta/datasets/cell_class/` with annotations in 
 `projects/placenta/annotations/cell_class/`. This data is split into respective data 
 collection sources (i.e. 'hmc' and 'uot1') which are combined during training.
@@ -115,8 +115,8 @@ specified by validation and/or test .csv files within `graph_splits/` as validat
 and/or test nodes. All other nodes will be marked as training nodes.  
 
 We provide the training data and ground truth annotations for training the graph model 
-across the cell graphs of two placenta WSIs, as per the paper. The training data is 
-found under `projects/placenta/embeddings/` and the ground truth annotations are found 
+across the cell graphs of two placenta WSIs, as per the paper. The training data should 
+be placed under `projects/placenta/embeddings/` and the ground truth annotations in 
 under `projects/placenta/annotations/graph`.
 
 To train the graph tissue model on this data, run:
@@ -187,7 +187,7 @@ below for an example.
 
 <img src="readme_images/demo_sample.png" width="300" align="right" />
 
-Add the demo slide section contained in `projects/placenta/slides/sample_wsi.tif` to 
+Add the demo slide section at `projects/placenta/slides/sample_wsi.tif` to 
 the database using:
 
 ```bash
