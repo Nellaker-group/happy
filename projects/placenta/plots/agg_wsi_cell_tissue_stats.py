@@ -2,7 +2,6 @@ from typing import List
 from pathlib import Path
 
 import typer
-import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -134,7 +133,6 @@ def main(
             ]
         ]
         avg_cells_within_tissues(organ, all_props, cell_colours, plot_save_path)
-        agg_cells_within_tissues(organ, all_props, cell_colours, plot_save_path)
 
 
 def avg_cells_within_tissues(organ, prop_df, cell_colours_mapping, save_path):
@@ -181,65 +179,6 @@ def avg_cells_within_tissues(organ, prop_df, cell_colours_mapping, save_path):
     print(f"Avg plot saved to {save_path / 'cells_in_tissues.png'}")
     plt.close()
     plt.clf()
-
-
-# find cell types within each tissue type and plot as stacked bar chart
-def agg_cells_within_tissues(
-    organ,
-    prop_df,
-    cell_colours_mapping,
-    save_path,
-):
-    tissue_label_to_name = {tissue.label: tissue.name for tissue in organ.tissues}
-    cell_label_to_name = {cell.label: cell.name for cell in organ.cells}
-
-    _, t_counts = np.unique(prop_df.index.values, return_counts=True)
-    tissues = ["Chorion", "SVilli", "MIVilli", "TVilli", "Sprout"]
-    t_indicies = [[t] * t_counts[0] for t in tissues]
-    t_indicies = [item for sublist in t_indicies for item in sublist]
-
-    # move bars of the same tissue next to each other
-    move_index = [
-        i + j * len(tissues)
-        for i in range(len(tissues) + 1)
-        for j in range(t_counts[0] - 1)
-    ]
-    prop_df.index = move_index
-    prop_df.sort_index(axis=0, ascending=True, inplace=True)
-    prop_df.index = t_indicies
-
-    prop_df.index = prop_df.index.map(tissue_label_to_name)
-    cell_colours = [cell_colours_mapping[cell] for cell in prop_df.columns]
-    prop_df.columns = prop_df.columns.map(cell_label_to_name)
-
-    sns.set(style="white")
-    plt.rcParams["figure.dpi"] = 600
-    ax = prop_df.plot(
-        kind="bar",
-        stacked=True,
-        color=cell_colours,
-        legend="reverse",
-        width=0.8,
-        figsize=(8.5, 6),
-    )
-    ax.set(xlabel=None)
-    plt.xticks(range(len(prop_df.index)), list(prop_df.index), size=9)
-    plt.yticks([])
-    handles, labels = ax.get_legend_handles_labels()
-    ax.legend(
-        handles[::-1],
-        labels[::-1],
-        loc="upper center",
-        bbox_to_anchor=(0.5, 1.15),
-        prop={"size": 9.25},
-        ncol=4,
-    )
-    box = ax.get_position()
-    ax.set_position([box.x0, box.y0, box.width, box.height])
-    plt.tight_layout()
-    sns.despine(left=True)
-    plt.savefig(save_path / "all_cells_in_tissues.png")
-    print(f"Plot saved to {save_path / 'cells_in_tissues.png'}")
 
 
 if __name__ == "__main__":

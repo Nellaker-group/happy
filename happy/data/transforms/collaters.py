@@ -20,7 +20,7 @@ def cell_collater(batch):
     # (batch, channel, x, y) for resnet that's (100, 224, 244, 3)
     transposed_imgs = np.transpose(imgs, axes=[0, 3, 2, 1])
 
-    sample_dict["img"] = torch.LongTensor(transposed_imgs)
+    sample_dict["img"] = torch.FloatTensor(transposed_imgs)
     sample_dict["annot"] = torch.LongTensor(annots)
 
     return sample_dict
