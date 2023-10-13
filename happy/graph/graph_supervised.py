@@ -126,6 +126,7 @@ def setup_model(
         out_channels=num_classes,
         num_layers=layers,
         dropout=dropout,
+        reduce_dims=64,
     )
     model = model.to(device)
     return model

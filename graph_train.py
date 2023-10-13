@@ -28,10 +28,6 @@ def main(
     organ_name: str = typer.Option(...),
     exp_name: str = typer.Option(...),
     run_ids: List[int] = typer.Option([]),
-    x_min: int = 0,
-    y_min: int = 0,
-    width: int = -1,
-    height: int = -1,
     k: int = 5,
     group_knts: bool = True,
     pretrained: Optional[str] = None,
@@ -58,10 +54,6 @@ def main(
     organ_name: name of organ
     exp_name: a name for this training experiment
     run_ids: the evalrun ids of the slides to get the embeddings from
-    x_min: the top left x coordinate of the patch to use
-    y_min: the top left y coordinate of the patch to use
-    width: the width of the patch to use. -1 for all
-    height: the height of the patch to use. -1 for all
     k: the value of k to use for the kNN or intersection graph
     group_knts: whether to process KNT predictions
     pretrained: path to a pretrained model (optional)
@@ -108,17 +100,11 @@ def main(
     for i, run_id in enumerate(run_ids):
         # Get training data from hdf5 files
         predictions, embeddings, coords, confidence = get_raw_data(
-            project_dir, run_id, x_min, y_min, width, height
+            project_dir, run_id, 0, 0, -1, -1
         )
         # Get ground truth manually annotated data
         _, _, tissue_class = get_groundtruth_patch(
-            organ,
-            project_dir,
-            x_min,
-            y_min,
-            width,
-            height,
-            annot_tsvs[i],
+            organ, project_dir, 0, 0, -1, -1, annot_tsvs[i]
         )
         # Covert isolated knts into syn and turn groups into a single knt point
         if group_knts:
@@ -134,7 +120,7 @@ def main(
         )
 
         # Split nodes into unlabelled, training and validation sets. So far, validation
-        # and test sets are only defined for run_id 0. If there is training data in
+        # and test sets are only defined for run_id 1. If there is training data in
         # tissue_class for other runs, that data will also be used for training.
         if run_id == 1:
             data = graph_supervised.setup_node_splits(
@@ -186,10 +172,10 @@ def main(
         organ_name,
         exp_name,
         run_ids,
-        x_min,
-        y_min,
-        width,
-        height,
+        0,
+        0,
+        -1,
+        -1,
         k,
         graph_method,
         batch_size,

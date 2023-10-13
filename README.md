@@ -28,7 +28,7 @@ classification**.
 
 ## Installation
 
-Our codebase is writen in python=3.7.2 and has been tested on Ubuntu 20.04.2 (WSL2), 
+Our codebase is writen in python=3.10 and has been tested on Ubuntu 20.04.2 (WSL2), 
 MacOS 11.1, and CentOS 7.9.2009 using both an NVIDIA A100 GPU and a CPU
 
 You will first need to install the vips C binaries. The libvips documentation lists
@@ -52,15 +52,16 @@ using the MakeFile. Installation should only take a few minutes.
 git clone git@github.com:Nellaker-group/happy.git
 cd happy
 # Activate conda or venv environment with python installation:
-# e.g. conda create -y -n happy python=3.7.2
+# e.g. conda create -y -n happy python=3.10
 #      conda activate happy
-make environment_cu113
+make environment_cu117
 ```
 The make command will run the following:
 
 ```bash
-pip install torch==1.11.0+cu113 torchvision==0.12.0+cu113 torchaudio==0.11.0 --extra-index-url https://download.pytorch.org/whl/cu113
-pip install torch-scatter torch-sparse torch-cluster torch-spline-conv torch-geometric==2.0.4 -f https://data.pyg.org/whl/torch-1.11.0+cu113.html
+pip install torch==2.0.1+cu117 torchvision==0.15.2+cu117 torchaudio==2.0.2 --index-url https://download.pytorch.org/whl/cu117
+pip install torch_geometric==2.3.1	
+pip install pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-2.0.0+cu117.html
 pip install -r requirements.txt
 pip install pyvips==2.1.14
 pip install -e .
@@ -109,12 +110,12 @@ inference pipeline across this WSI in the 3rd section.
 Placenta nuclei detection training data from the paper should be placed under 
 `projects/placenta/datasets/nuclei/` with annotations in 
 `projects/placenta/annotations/nuclei/`. This data is split into respective data 
-collection sources (i.e. 'hmc', 'uot1', 'nuh') which are combined during training.
+collection sources (i.e. 'hmc', 'uot', 'nuh') which are combined during training.
 
 To train the nuclei detection model, run:
 
 ```bash
-python nuc_train.py --project_name placenta --exp-name demo-train --annot-dir annotations/nuclei --dataset-names hmc --dataset-names uot1 --dataset-names uot2 --dataset-names uot3 --dataset-names empty --decay-gamma 0.5 --init-from-inc --frozen
+python nuc_train.py --project-name placenta --exp-name demo-train --annot-dir annotations/nuclei --dataset-names hmc --dataset-names uot --dataset-names empty --decay-gamma 0.5 --init-from-inc --frozen
 ```
 
 We recommend first fine tuning the model pretrained on the coco dataset using commands
@@ -126,12 +127,12 @@ unfrozen using `--pre-trained {path} --no-frozen --no-init-from-inc`.
 Placenta cell classification training data from the paper should be placed under 
 `projects/placenta/datasets/cell_class/` with annotations in 
 `projects/placenta/annotations/cell_class/`. This data is split into respective data 
-collection sources (i.e. 'hmc' and 'uot1') which are combined during training.
+collection sources (i.e. 'hmc', 'uot', 'nuh') which are combined during training.
 
 To train the cell classification model, run:
 
 ```bash
-python cell_train.py --project_name placenta --organ-name placenta --exp-name demo-train --annot-dir annotations/cell_class --dataset-names hmc --dataset-names uot1 --dataset-names uot2 --dataset-names uot3 --decay-gamma 0.5 --init-from-inc --frozen
+python cell_train.py --project-name placenta --organ-name placenta --exp-name demo-train --annot-dir annotations/cell_class --dataset-names hmc --dataset-names uot --dataset-names nuh --decay-gamma 0.5 --init-from-inc --frozen
 ```
 
 As with the nuclei detection model, we recommend first fine tuning the model pretrained 
