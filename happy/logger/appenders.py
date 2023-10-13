@@ -116,7 +116,7 @@ class File(_Appender):
         column_name = f"{dataset_name}_{metric_name}"
         if not epoch_num in self.train_stats.index:
             row = pd.Series([metric], index=[column_name])
-            self.train_stats = self.train_stats.append(row, ignore_index=True)
+            self.train_stats.loc[len(self.train_stats)] = row
         else:
             self.train_stats.loc[epoch_num][column_name] = metric
 

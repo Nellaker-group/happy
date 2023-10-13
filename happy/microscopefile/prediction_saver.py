@@ -70,7 +70,9 @@ class PredictionSaver:
 
         # remove some identical entries
         # (i.e. if there are two neighbours there will be 2 entries)
-        unique_dup_det_inds = np.unique([tuple(row) for row in dup_det_inds])
+        unique_dup_det_inds = np.unique(
+            np.array([tuple(row) for row in dup_det_inds], dtype=object)
+        )
 
         # if all elements of dup_det_inds were size 2, then you need a different unique
         if not isinstance(unique_dup_det_inds[0], tuple):

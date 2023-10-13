@@ -11,7 +11,7 @@ def cell_collater(batch):
     # take all possible keys
     sample_dict = {}
     for key in batch[0].keys():
-        if key is not "img" or key is not "annot":
+        if key != "img" or key != "annot":
             sample_dict[key] = [data[key] for data in batch]
 
     imgs = np.array([data["img"] for data in batch])
