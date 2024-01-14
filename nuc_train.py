@@ -26,7 +26,6 @@ def main(
     init_from_inc: bool = False,
     frozen: bool = True,
     vis: bool = False,
-    get_cuda_device_num: bool = False,
 ):
     """For training a nuclei detection model
 
@@ -53,9 +52,8 @@ def main(
         init_from_inc: whether to use imagenet pretrained weights
         frozen: whether to freeze most of the layers. True for only fine-tuning
         vis: whether to send stats to visdom for visualisation
-        get_cuda_device_num: True if you want the code to choose a gpu
     """
-    device = get_device(get_cuda_device_num)
+    device = get_device()
 
     hp = Hyperparameters(
         exp_name,

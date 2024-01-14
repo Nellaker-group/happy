@@ -3,7 +3,6 @@ from collections import OrderedDict
 from pathlib import Path
 import random
 
-import GPUtil
 import numpy as np
 import skimage.color
 import skimage.io
@@ -16,30 +15,11 @@ def set_seed(seed):
     np.random.seed(seed)
 
 
-def set_gpu_device():
-    print(GPUtil.showUtilization())
-    device_ids = GPUtil.getAvailable(
-        order="memory", limit=1, maxLoad=0.3, maxMemory=0.3
-    )
-    while not device_ids:
-        print("No GPU avail.")
-        time.sleep(10)
-        device_ids = GPUtil.getAvailable(
-            order="memory", limit=1, maxLoad=0.3, maxMemory=0.3
-        )
-    device_id = str(device_ids[0])
-    print(f"Using GPU number {device_id}")
-    return device_id
-
-
-def get_device(get_cuda_device_num=False):
+def get_device():
     if torch.cuda.is_available():
         torch.backends.cudnn.benchmark = True
         torch.backends.cudnn.enabled = True
-        if get_cuda_device_num:
-            return f"cuda:{set_gpu_device()}"
-        else:
-            return "cuda"
+        return "cuda"
     else:
         return "cpu"
 
