@@ -24,7 +24,6 @@ def main(
     cell_batch_size: int = 800,
     run_nuclei_pipeline: bool = True,
     run_cell_pipeline: bool = True,
-    get_cuda_device_num: bool = False,
 ):
     """Runs inference over a WSI for nuclei detection, cell classification, or both.
 
@@ -51,9 +50,8 @@ def main(
         cell_batch_size: batch size for cell inference
         run_nuclei_pipeline: True if you want to perform nuclei detection
         run_cell_pipeline: True if you want to perform cell classification
-        get_cuda_device_num: if you want the code to choose a gpu
     """
-    device = get_device(get_cuda_device_num)
+    device = get_device()
     project_dir = get_project_dir(project_name)
 
     # Create database connection
