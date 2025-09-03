@@ -1,8 +1,10 @@
+import signal
 import time
 from collections import OrderedDict
 from pathlib import Path
 import random
 
+import GPUtil
 import numpy as np
 import skimage.color
 import skimage.io
@@ -14,12 +16,30 @@ def set_seed(seed):
     random.seed(seed)
     np.random.seed(seed)
 
+def set_gpu_device():
+    print(GPUtil.showUtilization())
+    device_ids = GPUtil.getAvailable(
+        order="memory", limit=1, maxLoad=0.3, maxMemory=0.3
+    )
+    while not device_ids:
+        print("No GPU avail.")
+        time.sleep(10)
+        device_ids = GPUtil.getAvailable(
+            order="memory", limit=1, maxLoad=0.3, maxMemory=0.3
+        )
+    device_id = str(device_ids[0])
+    print(f"Using GPU number {device_id}")
+    return device_id
 
-def get_device():
+
+def get_device(get_cuda_device_num=False):
     if torch.cuda.is_available():
         torch.backends.cudnn.benchmark = True
         torch.backends.cudnn.enabled = True
-        return "cuda"
+        if get_cuda_device_num:
+            return f"cuda:{set_gpu_device()}"
+        else:
+            return "cuda"
     else:
         return "cpu"
 
@@ -60,12 +80,13 @@ def load_image(image_path):
     return process_image(img)
 
 
-def send_graph_to_device(data, device, tissue_class=None):
-    x, edge_index = data.x.to(device), data.edge_index.to(device)
-    if not tissue_class is None:
-        tissue_class = torch.Tensor(tissue_class).type(torch.LongTensor).to(device)
-    return x, edge_index, tissue_class
+class GracefulKiller:
+    kill_now = False
 
+    def __init__(self):
+        signal.signal(signal.SIGINT, self.exit_gracefully)
+        signal.signal(signal.SIGTERM, self.exit_gracefully)
 
-def save_model(model, save_path):
-    torch.save(model, save_path)
+    def exit_gracefully(self, signum, frame):
+        self.kill_now = True
+        print("End of program. Exiting gracefully after current loop")
