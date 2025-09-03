@@ -10,9 +10,6 @@ class PredictionSaver:
     Data is saved and read from a DB by the public interface. Saved coordinates match
     the original WSI. This means predictions are scaled to the pixel size of the
     original WSI. Before getting predictions, coords are scaled up to model pixel sizes.
-
-    Args:
-        file: MicroscopeFile object
     """
 
     def __init__(self, microscopefile):
@@ -29,7 +26,7 @@ class PredictionSaver:
         tile_x = str(self.file.tile_xy_list[tile_index][0])
         tile_y = str(self.file.tile_xy_list[tile_index][1])
 
-        cell_tile_size = 200 * self.file.rescale_ratio
+        cell_tile_size = 224 * self.rescale_ratio
 
         coords = []
         if boxes.size == 0:
@@ -56,9 +53,9 @@ class PredictionSaver:
             db.save_pred_workings(self.id, coords)
             db.mark_finished_tiles(self.id, [tile_index])
 
-    # Cluster overlapped tiles. Overlap value results in multiple predictions for
-    # same nuc, this removes them.
-    def cluster_multi_detections(self, nuclei_preds, dist_threshold=4):
+    # Cluster duplicate nuclei from overlapped tiles
+    @staticmethod
+    def cluster_multi_detections(nuclei_preds, dist_threshold=9):
         print("finding duplicate nuclei clusters to cluster into one")
         tree = sk.KDTree(nuclei_preds, metric="euclidean")
 
@@ -68,8 +65,7 @@ class PredictionSaver:
         # find all inds with at least one neighbour within radius and fewer than 5
         dup_det_inds = [x for x in all_nn_indices if 1 < len(x) < 5]
 
-        # remove some identical entries
-        # (i.e. if there are two neighbours there will be 2 entries)
+        # remove identical entries (if there are two neighbours there will be 2 entries)
         unique_dup_det_inds = np.unique(
             np.array([tuple(row) for row in dup_det_inds], dtype=object)
         )
@@ -102,7 +98,6 @@ class PredictionSaver:
         max_w = self.file.max_slide_width
         max_h = self.file.max_slide_height
         nuc_loc = nuclei_predictions
-
         mask = np.logical_and(
             (np.logical_and((nuc_loc[:, 0] - l) > 0, ((nuc_loc[:, 1] - l) > 0))),
             (
@@ -111,9 +106,7 @@ class PredictionSaver:
                 )
             ),
         )
-
         valid_nuclei = nuc_loc[mask]
-
         print(
             f"edge nuclei: {len(nuc_loc) - len(valid_nuclei)} "
             f"edge nuclei found and marked as invalid"
@@ -132,7 +125,7 @@ class PredictionSaver:
         db.validate_pred_workings(self.id, nuclei_preds)
         self.file.mark_finished_nuclei()
 
-    # Inserts valid/non duplicate predictions into Predictions table
+    # Inserts valid/non-duplicate predictions into Predictions table
     def commit_valid_nuclei_predictions(self):
         db.commit_pred_workings(self.id)
 
