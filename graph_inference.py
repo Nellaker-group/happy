@@ -17,7 +17,7 @@ from happy.graph.graph_creation.node_dataset_splits import setup_node_splits
 from happy.graph.graph_creation.create_graph import setup_graph
 from happy.graph.runners.eval_runner import EvalParams, EvalRunner
 from happy.hdf5 import get_embeddings_file
-from projects.placenta.graphs.processing.process_knots import process_knts
+from happy.happy.graph.utils.process_knots.py import process_knts
 
 
 def main(
