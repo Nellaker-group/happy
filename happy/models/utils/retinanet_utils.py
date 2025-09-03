@@ -132,7 +132,7 @@ class BBoxTransform(nn.Module):
 
 
 class ClipBoxes(nn.Module):
-    def __init__(self):
+    def __init__(self, width=None, height=None):
         super(ClipBoxes, self).__init__()
 
     def forward(self, boxes, img):

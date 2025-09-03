@@ -4,6 +4,7 @@ Code adapted from: https://github.com/yhenon/pytorch-retinanet
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 
 class FocalLoss(nn.Module):
