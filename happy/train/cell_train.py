@@ -7,7 +7,7 @@ from sklearn.metrics import accuracy_score
 from torch.optim.lr_scheduler import StepLR
 
 from happy.train.utils import get_cell_confusion_matrix
-from happy.models import resnet
+from happy.models.model_builder import build_cell_classifer
 from happy.data.setup_data import setup_cell_datasets
 from happy.data.setup_dataloader import setup_dataloaders
 
@@ -34,30 +34,42 @@ def setup_data(
     return dataloaders
 
 
-def setup_model(init_from_inc, out_features, pre_trained_path, frozen, device):
+def setup_model(
+    model_name, init_from_inc, out_features, pre_trained_path, frozen, device
+):
+    image_size = (299, 299) if model_name == "inceptionresnetv2" else (224, 224)
+
     if init_from_inc:
-        model = resnet.build_resnet(out_features=out_features, depth=50)
+        model = build_cell_classifer(model_name, out_features)
     else:
         state_dict = torch.load(pre_trained_path, map_location=device)
         state_dict_num_outputs = state_dict["fc.output_layer.weight"].size()[0]
-        model = resnet.build_resnet(out_features=out_features, depth=50)
+        model = build_cell_classifer(model_name, state_dict_num_outputs)
         model.load_state_dict(state_dict, strict=True)
 
         if state_dict_num_outputs != out_features:
-            num_features = model.fc[7].in_features
-            model.fc[7] = nn.Linear(num_features, out_features)
+            if model_name == "inceptionresnetv2":
+                num_features = model.last_linear[7].in_features
+                model.last_linear[7] = nn.Linear(num_features, out_features)
+            else:
+                num_features = model.fc[7].in_features
+                model.fc[7] = nn.Linear(num_features, out_features)
 
     for child in model.children():
         for param in child.parameters():
             param.requires_grad = not frozen
-    for param in model.fc.parameters():
-        param.requires_grad = True
+    if model_name == "inceptionresnetv2":
+        for param in model.last_linear.parameters():
+            param.requires_grad = True
+    else:
+        for param in model.fc.parameters():
+            param.requires_grad = True
 
     # Move to GPU and define the optimiser
     model = model.to(device)
     print(f"Frozen layers is {frozen}")
     print("Model loaded to device")
-    return model
+    return model, image_size
 
 
 def setup_training_params(
@@ -76,6 +88,7 @@ def setup_training_params(
         class_weights = compute_class_weight(
             "balanced", classes=np.unique(data), y=data
         )
+        class_weights = (class_weights + 1) / 2
         class_weights = torch.FloatTensor(class_weights)
         class_weights = class_weights.to(device)
         criterion = nn.CrossEntropyLoss(weight=class_weights)
@@ -209,6 +222,7 @@ def validate_model(
     if val_accuracy > prev_best_accuracy:
         name = f"cell_model_accuracy_{round(val_accuracy, 4)}.pt"
         torch.save(model.state_dict(), run_path / name)
+        logger.to_csv(run_path / "cell_train_stats.csv")
         print("Best model saved")
 
         # Generate confusion matrix for all the validation sets
