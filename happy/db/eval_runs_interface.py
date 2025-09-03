@@ -9,8 +9,7 @@ from happy.db.models_training import Model
 from happy.db.base import database, init_db
 
 
-def init():
-    db_name = "main.db"
+def init(db_name="main.db"):
     db_path = Path(__file__).parent.absolute() / db_name
     init_db(db_path)
 
@@ -36,6 +35,7 @@ def get_eval_run_by_id(run_id):
     eval_run = EvalRun.get_by_id(run_id)
     return eval_run
 
+
 # returns the path to the embeddings file for that run
 def get_embeddings_path(run_id, embeddings_dir=None):
     eval_run = EvalRun.get_by_id(run_id)
@@ -50,12 +50,11 @@ def get_embeddings_path(run_id, embeddings_dir=None):
 
         eval_run.embeddings_path = path_with_file
         eval_run.save()
-        return str(path_with_file)
+        return path_with_file
     else:
-        return eval_run.embeddings_path
+        return Path(eval_run.embeddings_path)
 
-
-# Updates temporary run tile state table with a new tiles run state
+# Updates temporary run tile state table with a new tiles run state    
 def save_new_tile_state(run_id, tile_xy_list):
     fields = [TileState.run, TileState.tile_index, TileState.tile_x, TileState.tile_y]
 
@@ -64,9 +63,21 @@ def save_new_tile_state(run_id, tile_xy_list):
 
     data = [(run_id, i, xs[i], ys[i]) for i in range(len(tile_xy_list))]
 
+    # EDIT: 29 10 2024
+    # Calculate safe batch size:
+    # SQLite limit is 32,766 variables
+    # Each record uses 4 variables
+    # So max records per batch should be 32,766 // 4 = 249
+    # Round down to 200 for safety
+    BATCH_SIZE = 200
+
+    # print current sqlite3 version
+    print(database.execute_sql("select sqlite_version();").fetchone())
+
     with database.atomic():
-        for batch in chunked(data, 8000):
+        for batch in chunked(data, BATCH_SIZE):
             TileState.insert_many(batch, fields=fields).execute()
+
 
 
 # Returns False if state is None, otherwise True
@@ -95,14 +106,24 @@ def get_remaining_tiles(run_id):
     return tile_coords
 
 
-def get_remaining_cells(run_id):
-    with database.atomic():
-        cell_coords = (
-            Prediction.select(Prediction.x, Prediction.y)
-            .where((Prediction.run == run_id) & (Prediction.cell_class.is_null(True)))
-            .dicts()
-        )
-    return cell_coords
+def get_remaining_cells(run_id,re_run_all_cell):
+    
+    if re_run_all_cell == False:
+        with database.atomic():
+            cell_coords = (
+                Prediction.select(Prediction.x, Prediction.y)
+                .where((Prediction.run == run_id) & (Prediction.cell_class.is_null(True)))
+                .dicts()
+            )
+        return cell_coords
+    else:
+        with database.atomic():
+            cell_coords = (
+                Prediction.select(Prediction.x, Prediction.y)
+                .where((Prediction.run == run_id))
+                .dicts()
+            )
+        return cell_coords
 
 
 def mark_finished_tiles(run_id, tile_indexes):
@@ -142,7 +163,8 @@ def get_all_unvalidated_nuclei_preds(run_id):
 
 def validate_pred_workings(run_id, valid_coords):
     print(f"marking {len(valid_coords)} nuclei as valid ")
-    batch = 100000
+    # Max coordiantes per batch 32,766 // 2 = 499
+    batch = 450
     with database.atomic():
         for i in range(0, len(valid_coords), batch):
             coords_vl = ValuesList(valid_coords[i : i + batch], columns=("x", "y"))
@@ -197,12 +219,19 @@ def get_num_remaining_tiles(run_id):
     )
 
 
-def get_num_remaining_cells(run_id):
-    return (
-        Prediction.select()
-        .where((Prediction.run == run_id) & (Prediction.cell_class.is_null(True)))
-        .count()
-    )
+def get_num_remaining_cells(run_id, re_run_all_cell):
+    if re_run_all_cell == False:
+        return (
+            Prediction.select()
+            .where((Prediction.run == run_id) & (Prediction.cell_class.is_null(True)))
+            .count()
+        )
+    else:
+        return (
+            Prediction.select()
+            .where(Prediction.run == run_id)
+            .count()
+        )
 
 
 def get_total_num_nuclei(run_id):
@@ -237,6 +266,79 @@ def get_nuclei_in_range(run_id, min_x, min_y, max_x, max_y):
         .tuples()
     )
 
+
 def get_slide_pixel_size_by_evalrun(run_id):
     slide = Slide.select().join(EvalRun).where(EvalRun.id == run_id).get()
     return slide.pixel_size
+
+
+def get_all_eval_runs():
+    return EvalRun.select()
+
+
+def copy_nuclei_predictions(run_id_to_copy):
+    with database.atomic():
+        old_run = EvalRun.get_by_id(run_id_to_copy)
+        new_run = EvalRun.create(
+            nuc_model=old_run.nuc_model,
+            slide=old_run.slide,
+            tile_width=old_run.tile_width,
+            tile_height=old_run.tile_height,
+            pixel_size=old_run.pixel_size,
+            overlap=old_run.overlap,
+            subsect_x=old_run.subsect_x,
+            subsect_y=old_run.subsect_y,
+            subsect_w=old_run.subsect_w,
+            subsect_h=old_run.subsect_h,
+            nucs_done=True,
+        )
+        new_run_id = new_run.id
+        print(f"Created new eval run with id {new_run_id} from run {run_id_to_copy}")
+
+        # Copy tile states
+        tile_states = TileState.select().where(TileState.run == run_id_to_copy).dicts()
+        tile_states = list(tile_states)
+        # change each old run id to the new run id
+        for tile_state in tile_states:
+            tile_state["run"] = new_run_id
+        # insert all tile states as new entries with the new run id
+        for batch in chunked(tile_states, 1000):
+            TileState.insert_many(batch).execute()
+        print(f"Copied {len(tile_states)} tile states to new run {new_run_id}")
+
+        # Copy predictions
+        predictions = Prediction.select().where(Prediction.run == run_id_to_copy).dicts()
+        predictions = list(predictions)
+        # change each old run id to the new run id and remove cell predictions
+        for prediction in predictions:
+            prediction["run"] = new_run_id
+            prediction["cell_class"] = None
+        # insert all predictions as new entries with the new run id
+        for batch in chunked(predictions, 1000):
+            Prediction.insert_many(batch).execute()
+        print(f"Copied {len(predictions)} nuclei predictions to new run {new_run_id}")
+
+        # Copy unvalidated predictions
+        unvalidated_predictions = (
+            UnvalidatedPrediction.select()
+            .where(UnvalidatedPrediction.run == run_id_to_copy)
+            .dicts()
+        )
+        unvalidated_predictions = list(unvalidated_predictions)
+        # change each old run id to the new run id
+        for unvalidated_prediction in unvalidated_predictions:
+            unvalidated_prediction["run"] = new_run_id
+        # insert all unvalidated predictions as new entries with the new run id
+        for batch in chunked(unvalidated_predictions, 1000):
+            UnvalidatedPrediction.insert_many(batch).execute()
+        print(
+            f"Copied {len(unvalidated_predictions)} unvalidated predictions "
+            f"to new run {new_run_id}"
+        )
+
+
+def delete_evalrun(run_id):
+    with database.atomic():
+        run = EvalRun.get_by_id(run_id)
+        run.delete_instance(recursive=True)
+        print(f"Deleted eval run {run_id}")
