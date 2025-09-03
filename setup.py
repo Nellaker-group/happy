@@ -23,6 +23,7 @@ setup(
             "nuc_train=nuc_train:main",
             "cell_train=cell_train:main",
             "graph_infer=graph_inference:main",
+            "graph_train=graph_train:main",
         ]
     },
 )
