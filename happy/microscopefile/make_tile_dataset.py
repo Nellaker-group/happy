@@ -23,6 +23,7 @@ def main(
     slide_ids: List[int] = typer.Option([]),
     coord_file_names: List[str] = typer.Option(...),
     target_pixel_size: float = 0.1109,
+    target_pixel_size_cell: float = 0.1109*200/224, #add cell specific pixel size
     tile_width: int = 1600,
     tile_height: int = 1200,
     split: Optional[float] = None,
@@ -78,7 +79,7 @@ def main(
             save_path, slides, target_pixel_size, paths_to_coords, split
         )
     elif dataset_type == "cell_class":
-        make_cell_images(save_path, slides, target_pixel_size, paths_to_coords)
+        make_cell_images(save_path, slides, target_pixel_size_cell, paths_to_coords) #save with CELL specific target pixel size
         make_cell_annotations(save_path, split)
     elif dataset_type == "empty":
         make_nuclei_images(
@@ -110,7 +111,7 @@ def make_nuclei_images(
 
 
 # Generate 200x200 training images for cell classifier
-def make_cell_images(save_path, slides, target_pixel_size, paths_to_coords):
+def make_cell_images(save_path, slides, target_pixel_size_cell, paths_to_coords): #CELL specific target pixel size
     for i, slide in enumerate(slides):
         coords = pd.read_csv(paths_to_coords[i])
         cell_classes = coords["class"]
@@ -120,9 +121,9 @@ def make_cell_images(save_path, slides, target_pixel_size, paths_to_coords):
             save_path,
             slide,
             (xs, ys),
-            target_pixel_size,
-            target_width=200,
-            target_height=200,
+            target_pixel_size_cell, #now make cell image specifically referred to CELL target pixel size
+            target_width=224, #changed from 200 to 224, directly crop out the 224 cell images
+            target_height=224,
             cell_classes=cell_classes.tolist(),
         )
 
@@ -215,6 +216,7 @@ def make_nuclei_annotations(
         )
 
 
+# TODO: change this to be consistent with nuclei annotation creation. To use the coord csvs
 # Generate ground truth annotation csvs for cell classifier
 def make_cell_annotations(save_path, split=None):
     # Creates the image path for each annotation/image
@@ -257,6 +259,7 @@ def make_cell_annotations(save_path, split=None):
         )
 
 
+# TODO: change this to be consistent with nuclei annotation creation. To use the coord csvs
 # Generate ground truth annotation csvs for empty tiles
 def make_empty_annotations(save_path, split=None):
     image_names = [Path(*save_path.parts[-3:]) / f for f in listdir(save_path)]
@@ -323,26 +326,27 @@ def _save_splits(object_type, images, num_val, num_test, df, save_path):
     train_df.to_csv(save_path / f"train_{object_type}.csv", header=False, index=False)
 
 
+# TODO: Remove the string manipulation for getting the slide_number (find a better identifier)
 # Saves a set of images based on coordinate and image size at save path location
 def _save_pngs(
     save_path,
     slide,
     coords,
-    target_pixel_size,
+    target_pixel_size_input, #function processes both nuclei and cell images, change variable name to avoid confusion 
     target_width,
     target_height,
     cell_classes=None,
 ):
     slide_name = slide.slide_name
     slide_number = slide_name.split("-")[0].split(".svs")[0]
-    rescale_ratio = target_pixel_size / slide.pixel_size
+    rescale_ratio = target_pixel_size_input / slide.pixel_size
 
     slide_path = str(Path(slide.lab.slides_dir) / slide_name)
     reader = Reader.new(slide_path, slide.lvl_x)
 
     xs, ys = coords
-    xs = (xs - (100 * rescale_ratio)).astype(int) if cell_classes else xs
-    ys = (ys - (100 * rescale_ratio)).astype(int) if cell_classes else ys
+    xs = (xs - (112 * rescale_ratio)).astype(int) if cell_classes else xs #changed from 100 to 112 (224/2) since we are cropping 224 directly 
+    ys = (ys - (112 * rescale_ratio)).astype(int) if cell_classes else ys #this is to get the top left xy from the centre xy
 
     for i in tqdm(range(len(xs))):
         x, y = xs[i], ys[i]
