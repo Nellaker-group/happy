@@ -275,7 +275,7 @@ def build_retina_net(num_classes, device, pretrained=False, resnet_depth=101):
     Args:
         num_classes (int0: number of output classes
         pretrained (bool): If True, returns a model pre-trained on ImageNet
-        resnet_depth (int): Depth of resnet model prior to adding Classification and Regression models
+        resnet_depth (int): Depth of renet model prior to adding Classification and Regression models
     """
 
     if resnet_depth == 18:

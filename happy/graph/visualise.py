@@ -1,5 +1,6 @@
 from matplotlib import pyplot as plt
 from matplotlib.collections import LineCollection
+import torch
 
 
 def visualize_points(
@@ -13,7 +14,12 @@ def visualize_points(
     edge_weight=None,
     colours=None,
     point_size=None,
+    colour_map="viridis",
 ):
+    if labels is not None:
+        if isinstance(labels[0], torch.Tensor):
+            labels = labels.tolist()
+
     if colours is None:
         colours_dict = {cell.id: cell.colour for cell in organ.cells}
         colours = [colours_dict[label] for label in labels]
@@ -46,7 +52,7 @@ def visualize_points(
         s=point_size,
         zorder=1000,
         c=colours,
-        cmap="Spectral",
+        cmap=colour_map,
     )
     plt.gca().invert_yaxis()
     plt.axis("off")

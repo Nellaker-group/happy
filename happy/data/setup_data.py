@@ -1,4 +1,5 @@
 import albumentations as al
+from albumentations.pytorch import ToTensorV2
 from torchvision import transforms
 
 from happy.data.transforms.agumentations import AlbAugmenter, StainAugment
@@ -90,30 +91,44 @@ def get_cell_dataset(organ, split, annot_dir, dataset_names, image_size):
 
 def _setup_transforms(augmentations, image_size=None, nuclei=True):
     transform = []
-    if augmentations:
-        transform.append(_augmentations(nuclei))
-    transform.append(Normalizer())
     if nuclei:
+        if augmentations:
+            augs = _augmentations()
+            transform.append(AlbAugmenter(list_of_albumentations=augs, bboxes=nuclei))
+        transform.append(Normalizer())
         transform.append(Resizer())
+        return transforms.Compose(transform)
     else:
-        transform.append(
-            Resizer(
-                min_side=image_size[0],
-                max_side=image_size[1],
-                padding=False,
-                scale_annotations=False,
-            )
+        if augmentations:
+            augs = _augmentations()
+            transform.extend(augs)
+        transform.extend(
+            [
+                al.Normalize(
+                    mean=(0.485, 0.456, 0.406),
+                    std=(0.229, 0.224, 0.225),
+                ),
+                al.Resize(image_size[0], image_size[1]),
+                ToTensorV2(),
+            ]
         )
-    return transforms.Compose(transform)
+        return al.Compose(transform)
 
 
-def _augmentations(nuclei):
+def _augmentations():
     alb = [
         al.Flip(p=0.5),
         al.RandomRotate90(p=0.5),
         StainAugment(get_rgb_matrices(), p=0.9, variance=0.4),
-        al.CLAHE(clip_limit=3.0, tile_grid_size=(8, 8), p=0.8),
+        al.CLAHE(clip_limit=3.0, tile_grid_size=(8, 8), p=0.7),
+        al.RandomToneCurve(scale=0.2, p=0.8),
+        al.RandomBrightnessContrast(
+            brightness_limit=(-0.1, 0.2),
+            contrast_limit=(0.0, 0.0),
+            brightness_by_max=False,
+            p=0.8,
+        ),
         al.GaussNoise(var_limit=(10.0, 200.0), p=0.8),
-        al.Blur(blur_limit=5, p=0.8),
+        al.Blur(blur_limit=(3, 7), p=0.8),
     ]
-    return AlbAugmenter(list_of_albumentations=alb, bboxes=nuclei)
+    return alb

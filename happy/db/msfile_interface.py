@@ -14,7 +14,7 @@ def get_msfile(
     tile_width=1600,
     tile_height=1200,
     pixel_size=0.1109,
-    overlap=400,
+    overlap=200,
     subsect_x=None,
     subsect_y=None,
     subsect_w=None,
@@ -87,4 +87,5 @@ def _init_msfile(run):
         run.subsect_w,
         run.nucs_done,
         run.cells_done,
+        full_slide_path,
     )

@@ -112,8 +112,8 @@ class StainAugment(al.ImageOnlyTransform):
         )
         # Randomly vary Eosin by -+ variance value
         img[:, :, [1]] = (
-            np.random.uniform(low=-variance, high=variance) + img[:, :, [1]]
-        )
+            np.random.uniform(low=-variance+0.1, high=variance) + img[:, :, [1]]
+        ) # +0.1 for negative variance as too low Eosin becomes green
         # Convert back to rgb colour space
         img = he2rgb(img, rgb_matrix)
         return img.astype(np.uint8)

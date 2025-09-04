@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 
 import pandas as pd
 
-from happy.utils.vis_plotter import VisdomLinePlotter
+from happy.utils.visdom_plotter import VisdomLinePlotter
 from happy.train.utils import plot_confusion_matrix
 
 
@@ -70,7 +70,8 @@ class Console(_Appender):
         print(f"{split_name} loss: {loss}")
 
     def log_confusion_matrix(self, cm, dataset_name, save_dir):
-        pass
+        print(f"{dataset_name} confusion matrix:")
+        print(cm)
 
 
 class File(_Appender):

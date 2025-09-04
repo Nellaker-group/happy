@@ -8,22 +8,21 @@ from happy.data.transforms.collaters import collater
 from happy.microscopefile import prediction_saver
 from happy.data.datasets.ms_dataset import NucleiDataset
 from happy.models import retinanet
-from happy.utils.graceful_killer import GracefulKiller
-from happy.utils.utils import load_weights
+from happy.utils.utils import load_weights, GracefulKiller
 from happy.data.transforms.transforms import Normalizer, Resizer
 from happy.db.msfile_interface import get_msfile
 import happy.db.eval_runs_interface as db
 
 
 # Load model weights and push to device
-def setup_model(project_dir, model_id, device):
+def setup_model(model_id, device):
     model_architecture, model_weights_path = db.get_model_weights_by_id(model_id)
-    print(f"model pre_trained path: {project_dir / model_weights_path}")
+    print(f"model pre_trained path: {model_weights_path}")
     if model_architecture == "retinanet":
         model = retinanet.build_retina_net(
             num_classes=1, device=device, pretrained=False, resnet_depth=101
         )
-        state_dict = torch.load(project_dir / model_weights_path)
+        state_dict = torch.load(model_weights_path)
         # Removes the module string from the keys if it's there.
         model = load_weights(state_dict, model)
     else:
@@ -35,7 +34,7 @@ def setup_model(project_dir, model_id, device):
 
 
 # Load datasets and dataloader
-def setup_data(slide_id, run_id, model_id, batch_size, overlap, num_workers):
+def setup_data(slide_id, run_id, model_id, big_tile_size, batch_size, overlap, num_workers):
     ms_file = get_msfile(
         slide_id=slide_id, run_id=run_id, nuc_model_id=model_id, overlap=overlap
     )
@@ -43,7 +42,7 @@ def setup_data(slide_id, run_id, model_id, batch_size, overlap, num_workers):
     print("loading datasets")
     remaining_data = np.array(db.get_remaining_tiles(ms_file.id))
     curr_data_set = NucleiDataset(
-        ms_file, remaining_data, transform=transforms.Compose([Normalizer(), Resizer()])
+        ms_file, remaining_data, big_tile_size, transform=transforms.Compose([Normalizer(), Resizer()])
     )
     print("datasets loaded")
     print("creating dataloader")
@@ -52,6 +51,8 @@ def setup_data(slide_id, run_id, model_id, batch_size, overlap, num_workers):
         num_workers=num_workers,
         collate_fn=collater,
         batch_size=batch_size,
+        prefetch_factor=2,
+        pin_memory=True
     )
     print("dataloader ready")
     return dataloader, pred_saver
@@ -59,7 +60,7 @@ def setup_data(slide_id, run_id, model_id, batch_size, overlap, num_workers):
 
 # Predict nuclei loop
 def run_nuclei_eval(
-    dataset, model, pred_saver, device, score_threshold=0.3, max_detections=150
+    dataset, model, pred_saver, device, score_threshold, max_detections, verbose
 ):
     # object for graceful shutdown. Current loop finishes on SIGINT or SIGTERM
     killer = GracefulKiller()
@@ -67,8 +68,12 @@ def run_nuclei_eval(
     tiles_to_evaluate = db.get_num_remaining_tiles(pred_saver.id)
     model.eval()
     with torch.no_grad():
-        with tqdm(total=tiles_to_evaluate) as pbar:
+        # startpoint=[]
+        # endpoint=[0]
+        with tqdm(total=tiles_to_evaluate, disable=not verbose) as pbar:
+
             for batch in dataset:
+                # log_current_usage(f"batch start:")
                 if not killer.kill_now:
                     # find the indices in the batch which are and aren't empty tiles
                     empty_mask = np.array(batch["empty_tile"])
@@ -95,6 +100,7 @@ def run_nuclei_eval(
                         # Network can't be fed batches of images
                         # as it returns predictions in one array
                         for i, non_empty_ind in enumerate(non_empty_inds):
+                            # startpoint.append(time.time())
                             # run network on non-empty images/tiles
                             model_input = torch.from_numpy(
                                 np.expand_dims(non_empty_imgs[i], axis=0)
@@ -106,17 +112,23 @@ def run_nuclei_eval(
 
                             # Correct predictions from resizing of img.
                             boxes /= scale
-
+                            
                             # select indices which have a score above the threshold
                             image_boxes = pred_saver.filter_by_score(
                                 max_detections, score_threshold, scores, boxes
                             )
 
                             pred_saver.save_nuclei(non_empty_ind, image_boxes)
+                            #log_current_usage(f"Non-empty batch inference end:")
                             pbar.update()
+
+                            # endpoint.append(time.time())
+                    # time.sleep(1)  # Any pause between epochs
+                    # log_current_usage("Between loop:")
                 else:
                     early_break = True
                     break
+                torch.cuda.empty_cache()
 
     if not early_break and not pred_saver.file.nucs_done:
         pred_saver.apply_nuclei_post_processing(cluster=True, remove_edges=True)

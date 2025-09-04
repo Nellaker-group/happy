@@ -1,11 +1,14 @@
 import os
 from abc import ABC, abstractmethod
 
-import bioformats
-import javabridge
+#import bioformats
+# :import javabridge
 import numpy as np
 import openslide
 import pyvips
+
+import logging
+logging.basicConfig(level=logging.WARNING)
 
 
 class Reader(ABC):
@@ -25,21 +28,35 @@ class Reader(ABC):
     def get_img(self, x, y, w, h, bound=True):
         pass
 
+    @staticmethod
+    def get_pyvips_version():
+        try:
+            version_full = pyvips.__version__
+            version_num = float('.'.join(version_full.split('.')[:2]))
+            return version_num
+        except:
+            print("Error getting pyvips version")
+
     # Determine which slide reader library can deal with the file type and
     # return the appropriate class instantiation
     @staticmethod
     def new(slide_path, lvl_x):
         file_type = "." + os.path.split(slide_path)[1].split(".")[-1]
-        if file_type in __LIBVIPS__:
-            print("libvips format")
-            return Libvips(slide_path, file_type, lvl_x)
-        elif file_type in __OPENSLIDE__:
+        if file_type in __OPENSLIDE__:
             print("Openslide format")
             return OpenSlideFile(slide_path, file_type, lvl_x)
-        elif file_type in __BIOFORMATS__:
-            print("Bioformat format")
-            javabridge.start_vm(class_path=bioformats.JARS)
-            return BioFormatsFile(slide_path, file_type, lvl_x)
+        elif file_type in __LIBVIPS__:
+            pyvips_version = Reader.get_pyvips_version() #get pyvips version and pull correct reader class
+            if pyvips_version >= 2.2:
+                print(f"Libvips 2 format, pyvips version: {pyvips_version}")
+                return Libvips_2(slide_path, file_type, lvl_x)
+            else:
+                print(f"Libvips format, pyvips version: {pyvips_version}")
+                return Libvips(slide_path, file_type, lvl_x)
+        #elif file_type in __BIOFORMATS__:
+            # print("Bioformat format")
+            # javabridge.start_vm(class_path=bioformats.JARS)
+            # return BioFormatsFile(slide_path, file_type, lvl_x)
         else:
             raise Exception(
                 f'File format "{file_type}" not '
@@ -47,60 +64,60 @@ class Reader(ABC):
             )
 
 
-class BioFormatsFile(Reader):
-    def __init__(self, slide_path, file_type, lvl_x):
-        super().__init__(slide_path, lvl_x)
-        self.file_type = file_type
+#class BioFormatsFile(Reader):
+    # def __init__(self, slide_path, file_type, lvl_x):
+    #     super().__init__(slide_path, lvl_x)
+    #     self.file_type = file_type
 
-    @property
-    def reader(self):
-        return bioformats.ImageReader(self.slide_path)
+    # @property
+    # def reader(self):
+    #     return bioformats.ImageReader(self.slide_path)
 
-    @property
-    def max_slide_width(self):
-        return self.reader.rdr.getSizeX()
+    # @property
+    # def max_slide_width(self):
+    #     return self.reader.rdr.getSizeX()
 
-    @property
-    def max_slide_height(self):
-        return self.reader.rdr.getSizeY()
+    # @property
+    # def max_slide_height(self):
+    #     return self.reader.rdr.getSizeY()
 
-    def get_pixel_size(self, pixel_size):
-        """Try to get the pixel size dimensions out of the metadata"""
-        if not pixel_size:
-            print(
-                "WARNING: can't generate pixel size from bioformats files. "
-                "Please input correct pixel size"
-            )
-        else:
-            print(f"using input {pixel_size} pixel size")
-        return pixel_size
+    # def get_pixel_size(self, pixel_size):
+    #     """Placeholder to try to get the pixel size dimensions out of the metadata"""
+    #     if not pixel_size:
+    #         print(
+    #             "WARNING: can't generate pixel size from bioformats files. "
+    #             "Please input correct pixel size"
+    #         )
+    #     else:
+    #         print(f"using input {pixel_size} pixel size")
+    #     return pixel_size
 
-    def get_img(self, x, y, w, h, bound=True):
-        full_img = np.zeros((h, w, 3))
-        bounded_w = w
-        bounded_h = h
-        x = min(self.max_slide_width - 1, x)
-        y = min(self.max_slide_height - 1, y)
-        if bound:
-            bounded_w = min(w, self.max_slide_width - x)
-            bounded_h = min(h, self.max_slide_height - y)
+    # def get_img(self, x, y, w, h, bound=True):
+    #     full_img = np.zeros((h, w, 3))
+    #     bounded_w = w
+    #     bounded_h = h
+    #     x = min(self.max_slide_width - 1, x)
+    #     y = min(self.max_slide_height - 1, y)
+    #     if bound:
+    #         bounded_w = min(w, self.max_slide_width - x)
+    #         bounded_h = min(h, self.max_slide_height - y)
 
-        # Note: Weirdness with axis flipping in image (x,y)
-        # coords will be affected by this
-        # W and H flipped in np array for image
-        avail_img = (
-            self.reader.read(z=self.lvl_x, XYWH=(x, y, bounded_w, bounded_h)) * 255
-        )
+    #     # Note: Weirdness with axis flipping in image (x,y)
+    #     # coords will be affected by this
+    #     # W and H flipped in np array for image
+    #     avail_img = (
+    #         self.reader.read(z=self.lvl_x, XYWH=(x, y, bounded_w, bounded_h)) * 255
+    #     )
 
-        np.add(
-            full_img[:bounded_h, :bounded_w],
-            avail_img,
-            out=full_img[:bounded_h, :bounded_w],
-        )
-        return full_img
+    #     np.add(
+    #         full_img[:bounded_h, :bounded_w],
+    #         avail_img,
+    #         out=full_img[:bounded_h, :bounded_w],
+    #     )
+    #     return full_img
 
-    def stop_vm(self):
-        javabridge.kill_vm()
+    # def stop_vm(self):
+    #     javabridge.kill_vm()
 
 
 class OpenSlideFile(Reader):
@@ -207,7 +224,7 @@ class Libvips(Reader):
             bounded_w = min(w, self.max_slide_width - x)
             bounded_h = min(h, self.max_slide_height - y)
 
-        avail_img = self.region.fetch(x, y, bounded_w, bounded_h)
+        avail_img = self.region.fetch(x, y, bounded_w, bounded_h) #pyvips 2.2 not support
 
         full_img = np.ndarray(
             buffer=avail_img,
@@ -216,6 +233,75 @@ class Libvips(Reader):
         )[:, :, 0:3]
 
         return full_img
+    
+class Libvips_2(Reader):
+    def __init__(self, slide_path, file_type, lvl_x):
+        super().__init__(slide_path, lvl_x)
+        self.file_type = file_type
+
+    @property
+    def reader(self):
+        if self.file_type == ".scn":
+            return pyvips.Image.new_from_file(
+                self.slide_path, access="sequential", autocrop=True
+            )
+        else:
+            return pyvips.Image.new_from_file(self.slide_path, access="sequential") # load image supported
+
+    @property
+    def max_slide_width(self):
+        return self.reader.width
+
+    @property
+    def max_slide_height(self):
+        return self.reader.height
+
+    @property
+    def region(self):
+        return pyvips.Region.new(self.reader)
+
+    def get_pixel_size(self, pixel_size):
+        """Try to get the pixel size dimensions out of the metadata"""
+        try:
+            pix_x_size = float(self.reader.get("openslide.mpp-x")) # NB get_fields lists aviable fields, get gets a header field value
+            pix_y_size = float(self.reader.get("openslide.mpp-y"))
+            assert round(pix_x_size, 4) == round(pix_y_size, 4)
+            print(f"Pixel size {pix_x_size} found and extracted from slide metadata")
+            return pix_y_size
+        except:
+            print(f"Slide Pixel size not found, using input pixel size {pixel_size}")
+            return pixel_size
+
+    def get_img(self, x, y, w, h, bound=True):
+        try:
+            bounded_w = w
+            bounded_h = h
+            x = int(min(self.max_slide_width - 1, x))
+            y = int(min(self.max_slide_height - 1, y))
+            if bound:
+                bounded_w = min(w, self.max_slide_width - x)
+                bounded_h = min(h, self.max_slide_height - y)
+
+            # region (depricated) fetch with crop and np operations
+            
+            # extract region
+            region = self.reader.crop(x, y, bounded_w, bounded_h)
+
+            # convert region to np array
+            full_img = np.ndarray(
+                buffer=region.write_to_memory(),
+                dtype=np.uint8,
+                shape=[bounded_h, bounded_w, self.reader.bands],
+            )[:, :, 0:3]
+
+            return full_img
+        
+        except pyvips.Error as e:
+            # error handeling
+
+            logging.error(f"Error reading image region: {e}")
+            raise
+
 
 
 __BIOFORMATS__ = {
