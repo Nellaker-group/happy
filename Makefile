@@ -1,4 +1,4 @@
-.PHONY: environment_cpu environment_cu118 setup test fmt
+.PHONY: environment_cpu environment_cu121 setup test fmt
 
 environment_cpu:
 	python -m pip install torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2
@@ -29,6 +29,9 @@ environment_cu118:
 	python -m pip install -e .
 
 environment_cu121:
+	python -m pip install torch==2.1.2+cu121 torchvision==0.16.2+cu121 torchaudio==2.1.2 --index-url https://download.pytorch.org/whl/cu121
+	python -m pip install torch_geometric==2.4.0
+	python -m pip install pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-2.1.0+cu121.html
 	python -m pip install -r requirements.txt
 	python -m pip install datashader==0.15.2
 	python -m pip install "holoviews[recommended]"
@@ -41,4 +44,5 @@ test:
 	pytest
 
 fmt:
+
 	python -m black happy projects analysis qupath
