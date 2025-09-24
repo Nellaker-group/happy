@@ -257,3 +257,14 @@ graph in `analysis/evaluation/vis_graph_patch.py`, and the ground truth tissue p
 
 in `analysis/evaluation/vis_groundtruth_graph.py`.
 
+## Big tile approad and Testing instruction for cell inference 
+
+### Update to HAPPYv2.0
+
+HAPPY now use a new way to fetch images tiles from the WSI!
+
+<ins>Before</ins>: Readers (e.g.OpenSlide) fetches the huge number of 1600px by 1200px nuclei tile and 200px by 200 px cell tiles directly from the WSI to CPU. 
+        the I/O restrain has led to extremely slow inference speed.
+        
+<ins>After</ins>: Readers now fetched a large (default 15000px by 15000px) tile from the WSI to the CPU first, then crop the corresponding small tiles from the big tiles in the CPU
+before sending the small tiles to the GPU for inferencinbg.
