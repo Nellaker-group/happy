@@ -31,8 +31,8 @@ classification**.
 
 ## Installation
 
-Our codebase is writen in python=3.11 and has been tested on Ubuntu 20.04.2 (WSL2), 
-MacOS 11.1, and CentOS 7.9.2009 using both an NVIDIA A100 GPU and a CPU
+Our codebase is writen in Python 3.11 and has been tested on Ubuntu 20.04.2 (WSL2), 
+MacOS 15.1, and CentOS 7.9.2009 using both an NVIDIA A100 GPU and a CPU
 
 You will first need to install the vips C binaries. The libvips documentation lists
 installation instructions [here](https://github.com/libvips/libvips/wiki) for different 
@@ -49,7 +49,7 @@ sudo apt install libvips
 ```
 
 For all remaining Python source code and dependencies, we recommend installation 
-using the MakeFile. Installation should only take a few minutes.
+using the Makefile. Installation should only take a few minutes.
 
 ```bash
 git clone git@github.com:Nellaker-group/happy.git
@@ -150,7 +150,7 @@ We provide utility scripts for generating your own training data.
 **Nuclei Detection and Cell Classification:**
 If you have used QuPath to create cell point annotations within boxes, you may use 
 `qupath/GetPointsInBox.groovy` to extract a .csv of these ground truth points and
-classes. From this .csv, you may use `happpy/microscopefile/make_tile_dataset.py` to
+classes. From this .csv, you may use `happy/microscopefile/make_tile_dataset.py` to
 generate a dataset of tile images and train/val/test split annotation files from your
 annotations for both nuclei detection and cell classification. 
 
@@ -248,7 +248,8 @@ HAPPY now use a new way to fetch images tiles from the WSI!
         the I/O restrain has led to extremely slow inference speed.
         
 <ins>After</ins>: Readers now fetched a large (default 15000px by 15000px) tile from the WSI to the CPU first, then crop the corresponding small tiles from the big tiles in the CPU
-before sending the small tiles to the GPU for inferencinbg.
+before sending the small tiles to the GPU for inferencing.
+
 
 
 
