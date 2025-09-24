@@ -31,7 +31,7 @@ classification**.
 
 ## Installation
 
-Our codebase is writen in python=3.10 and has been tested on Ubuntu 20.04.2 (WSL2), 
+Our codebase is writen in python=3.11 and has been tested on Ubuntu 20.04.2 (WSL2), 
 MacOS 11.1, and CentOS 7.9.2009 using both an NVIDIA A100 GPU and a CPU
 
 You will first need to install the vips C binaries. The libvips documentation lists
@@ -54,23 +54,25 @@ using the MakeFile. Installation should only take a few minutes.
 ```bash
 git clone git@github.com:Nellaker-group/happy.git
 cd happy
-# Activate conda or venv environment with python installation:
-# e.g. conda create -y -n happy python=3.10
-#      conda activate happy
-make environment_cu117
+# Activate venv environment with python installation:
+# e.g. python3 -m venv happy-env
+# source happy-env/bin/activate
+python -m pip install --upgrade pip setuptools wheel
+# GPU (CUDA 12.1)
+make environment_cu121
 ```
 The make command will run the following:
 
 ```bash
-pip install torch==2.0.1+cu117 torchvision==0.15.2+cu117 torchaudio==2.0.2 --index-url https://download.pytorch.org/whl/cu117
-pip install torch_geometric==2.3.1	
-pip install pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-2.0.0+cu117.html
+pip install torch==2.1.2+cu121 torchvision==0.16.2+cu121 torchaudio==2.1.2 --index-url https://download.pytorch.org/whl/cu121
+pip install torch_geometric==2.4.0	
+pip install pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-2.1.0+cu121.html
 pip install -r requirements.txt
-pip install pyvips==2.1.14
 pip install -e .
 ```
 If you would rather install a different version of pytorch for your cuda version, 
 please change the first two lines as per library instructions.
+Makefile provides targets for CPU and different CUDA versions.
 
 ### Troubleshooting
 
@@ -266,5 +268,6 @@ HAPPY now use a new way to fetch images tiles from the WSI!
         
 <ins>After</ins>: Readers now fetched a large (default 15000px by 15000px) tile from the WSI to the CPU first, then crop the corresponding small tiles from the big tiles in the CPU
 before sending the small tiles to the GPU for inferencinbg.
+
 
 
