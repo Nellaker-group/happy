@@ -1,6 +1,6 @@
 # Histology Analysis Pipeline.py (HAPPY) <img src="readme_images/HAPPYPlacenta.png" width="100" align="right" />
 
-## [HAPPYv2.0 UPDATE Sept 2025](#big-tile-approad-and-testing-instruction-for-cell-inference)
+## [HAPPYv2.0 UPDATE Sept 2025](#update-to-happyv2.0)
 HAPPY now has a new way to fetch images for nuclei and cell inferencing, and an updated graph model design. Model weights will work with the nuclei + cell models still, but requires the updated graph model weights or retraining.
 
 ## Overview
@@ -257,9 +257,7 @@ graph in `analysis/evaluation/vis_graph_patch.py`, and the ground truth tissue p
 
 in `analysis/evaluation/vis_groundtruth_graph.py`.
 
-## Big tile approad and Testing instruction for cell inference 
-
-### Update to HAPPYv2.0
+## Update to HAPPYv2.0
 
 HAPPY now use a new way to fetch images tiles from the WSI!
 
@@ -268,3 +266,4 @@ HAPPY now use a new way to fetch images tiles from the WSI!
         
 <ins>After</ins>: Readers now fetched a large (default 15000px by 15000px) tile from the WSI to the CPU first, then crop the corresponding small tiles from the big tiles in the CPU
 before sending the small tiles to the GPU for inferencinbg.
+
