@@ -5,7 +5,7 @@ database = SqliteDatabase(None)
 
 def init_db(db_name):
     # Local imports need to create all the tables and avoid circular import of BaseModel
-    from happy.db.slides import Slide, Patient, Lab
+    from happy.db.slides import Slide, Patient, Lab, ClinicalHistory
     from happy.db.eval_runs import (
         EvalRun,
         Prediction,
@@ -34,6 +34,7 @@ def init_db(db_name):
     database.create_tables(
         [
             Slide,
+            ClinicalHistory,
             Patient,
             Lab,
             EvalRun,

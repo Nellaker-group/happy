@@ -34,11 +34,11 @@ class Logger:
 
     def log_loss(self, split_name, epoch_num, loss):
         for a in self.appenders:
-            self.appenders[a].log_loss(split_name, epoch_num, round(loss, 4))
+            self.appenders[a].log_loss(split_name, epoch_num, round(loss, 6))
 
     def log_batch_loss(self, batch_count, loss):
         for a in self.appenders:
-            self.appenders[a].log_batch_loss(batch_count, round(loss, 4))
+            self.appenders[a].log_batch_loss(batch_count, round(loss, 6))
 
     def log_confusion_matrix(self, cm, dataset_name, save_dir):
         for a in self.appenders:

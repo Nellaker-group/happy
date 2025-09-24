@@ -1,10 +1,11 @@
+from pathlib import Path
 from collections import namedtuple
 from typing import List
 import os
 
 import typer
 
-from happy.utils.utils import get_device, get_project_dir
+from happy.utils.utils import get_device
 from happy.train.point_eval import evaluate_points_over_dataset
 from happy.train.nuc_train import setup_data, setup_model
 
@@ -19,13 +20,13 @@ def main(
     valid_distance: int = 30,
     use_test_set: bool = False,
 ):
-    """Evaluates model performance across validation or test datasets
+    """Evaluates model performance across validation datasets
 
     Args:
         project_name: name of the project dir to save visualisations to
         annot_dir: relative path to annotations
         pre_trained: relative path to pretrained model
-        dataset_names: the datasets' validation set to evaluate over
+        dataset_names: the datasets who's validation set to evaluate over
         score_threshold: the confidence threshold below which to discard predictions
         max_detections: number of maximum detections to save, ordered by score
         valid_distance: distance to gt in pixels for which a prediction is valid
@@ -33,7 +34,9 @@ def main(
     """
     device = get_device()
 
-    project_dir = get_project_dir(project_name)
+    project_dir = (
+        Path(__file__).absolute().parent.parent.parent / "projects" / project_name
+    )
     os.chdir(str(project_dir))
 
     HPs = namedtuple("HPs", "dataset_names batch")

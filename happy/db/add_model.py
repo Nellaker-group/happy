@@ -8,7 +8,10 @@ import happy.db.eval_runs_interface as db
 
 
 def main(
-    path_to_model: Path = typer.Option(...),
+    db_name: str = "main.db",
+    path_to_model: Path = typer.Option(
+        ..., exists=True, file_okay=True, dir_okay=False, resolve_path=True
+    ),
     model_performance: float = typer.Option(...),
     run_name: str = typer.Option(...),
     run_type: str = typer.Option(...),
@@ -22,24 +25,24 @@ def main(
     """Add a trained model to the database
 
     Args:
-        path_to_model: path to the saved model relative to project
+        path_to_model: absolute path to final saved model
         model_performance: 0-1 value of validation performance of model
         slides_dir: absolute path to the dir containing the slides
         run_name: name of the training run which generated the model
         run_type: one of "Nuclei" or "Cell"
-        path_to_pretrained_model: path from results/run_type to pretrained model if used
+        path_to_pretrained_model: path from results/run_type to pretrained model if used, not null db constraint.
         num_epochs: number of epochs trained for
         batch_size: batch size during training
         init_lr: initial learning rate
         lr_step: epoch step at which learning rate decayed (can be None)
         model_architecture: Type of model used (e.g. retinanet)
     """
-    db.init()
+    db.init(db_name)
 
     train_run = TrainRun.create(
         run_name=run_name,
         type=run_type,
-        pre_trained_path=path_to_pretrained_model,
+        pre_trained_path=path_to_pretrained_model or '',
         num_epochs=num_epochs,
         batch_size=batch_size,
         init_lr=init_lr,

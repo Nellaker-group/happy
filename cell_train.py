@@ -27,15 +27,17 @@ def main(
     step_size: int = 20,
     init_from_inc: bool = False,
     frozen: bool = True,
-    vis: bool = False,
+    weighted_loss: bool = False,
+    vis: bool = True,
+    get_cuda_device_num: bool = False,
 ):
     """For training a cell classification model
 
     Multiple datasets can be combined by passing in 'dataset_names' multiple times with
     the correct datasets directory name.
 
-    Visualising the batch and epoch level training stats requires having a visdom
-    server running on port 8998.
+    Visualising the batch and epoch metrics during training requires having a visdom
+    server running on port 8998 (and vis=True).
 
     Args:
         project_name: name of the project dir to save results to
@@ -49,14 +51,16 @@ def main(
         epochs: number of epochs to train for
         batch: batch size of the training set
         val_batch: batch size of the validation sets
-        learning_rate: learning rate which decreases every 8 epochs
+        learning_rate: initial learning rate which decreases every step size
         decay_gamma: amount to decay learning rate by. Set to 1 for no decay.
         step_size: epoch at which to apply learning rate decay.
         init_from_inc: whether to use imagenet/coco pretrained weights
         frozen: whether to freeze most of the layers. True for only fine-tuning
+        weighted_loss: whether to use weighted loss for imbalanced datasets
         vis: whether to use visdom for visualisation
+        get_cuda_device_num: True if you want the code to choose a gpu
     """
-    device = get_device()
+    device = get_device(get_cuda_device_num)
 
     hp = Hyperparameters(
         exp_name,
@@ -76,8 +80,8 @@ def main(
     os.chdir(str(project_dir))
 
     # Setup the model. Can be pretrained from coco or own weights.
-    model = cell_train.setup_model(
-        hp.init_from_inc, len(organ.cells), hp.pre_trained, frozen, device
+    model, image_size = cell_train.setup_model(
+        model_name, hp.init_from_inc, len(organ.cells), hp.pre_trained, frozen, device
     )
 
     # Get all datasets and dataloaders, including separate validation datasets
@@ -85,7 +89,7 @@ def main(
         organ,
         project_dir / annot_dir,
         hp,
-        (224, 224),
+        image_size,
         num_workers,
         multiple_val_sets,
         val_batch,
@@ -100,13 +104,14 @@ def main(
         hp.learning_rate,
         dataloaders["train"],
         device,
-        weighted_loss=False,
-        decay_gamma=decay_gamma,
-        step_size=step_size,
+        weighted_loss,
+        decay_gamma,
+        step_size,
     )
 
     # Save each run by it's timestamp
     run_path = utils.setup_run(project_dir, exp_name, "cell_class")
+    hp.to_csv(run_path)
 
     # train!
     try:
@@ -129,9 +134,10 @@ def main(
             device,
         )
     except KeyboardInterrupt:
-        save_hp = input("Would you like to save the hyperparameters anyway? y/n: ")
-        if save_hp == "y":
-            hp.to_csv(run_path)
+        save = input("Would you like to save hyperparameters, train stats, and model anyway? y/n: ")
+        if save == "y":
+            # Save hyperparameters, the logged train stats, and the final model
+            cell_train.save_state(logger, model, hp, run_path)
 
     # Save hyperparameters, the logged train stats, and the final model
     cell_train.save_state(logger, model, hp, run_path)

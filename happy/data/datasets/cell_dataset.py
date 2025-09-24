@@ -4,6 +4,7 @@ from pathlib import Path
 import pandas as pd
 from PIL import Image
 from torch.utils.data import Dataset
+import sys
 
 from happy.utils.utils import load_image
 
@@ -40,11 +41,15 @@ class CellDataset(Dataset):
         return len(self.all_annotations)
 
     def __getitem__(self, idx):
-        img = load_image(self.all_annotations["image_path"][idx])
+        img = load_image(self.all_annotations["image_path"][idx])  
         annot = self._get_class_in_image(idx)
-        sample = {"img": img, "annot": annot}
         if self.transform:
-            sample = self.transform(sample)
+            sample = self.transform(image=img)
+            sample["img"] = sample["image"]
+            del sample["image"]
+            sample["annot"] = annot
+        else:
+            sample = {"img": img, "annot": annot}
         return sample
 
     def _load_datasets(self, dataset_names):
