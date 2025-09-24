@@ -297,7 +297,7 @@ in `analysis/evaluation/vis_groundtruth_graph.py`.
 
 ## Update to HAPPYv2
 
-HAPPY v2.0 introduces updats to the pipeline, for speed and more robust workflows.
+HAPPY v2.0 introduces updates to the pipeline, for speed and more robust workflows.
 
 ### Faster image fetching (nuc + cell pipeline)
 
@@ -310,10 +310,11 @@ Also integrates (histolab)[https://histolab.readthedocs.io/en/latest/tissue_mask
 
 ## Graph pipeline improvements
 
-== graph models trained with the old architecture are no longer compatible, require using new model weights or retraining with updated pipeline ==
+> graph models trained with the old architecture are no longer compatible, require using new model weights or retraining with updated pipeline
 
-Updates: standardisation :Added `--standardise` flag to normalise embeddings (zero mean, unit variance) before training instead of using raw embeddings as node features. This gives an easy performance boost.
+Updates: added `--standardise` flag to normalise embeddings (zero mean, unit variance) before training instead of using raw embeddings as node features. This gives an easy performance boost.
 Improved the clusterGCN to mimic the cell model's final layers including adding batch normalisation.
+
 
 
 
