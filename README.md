@@ -1,13 +1,12 @@
 # Histology Analysis Pipeline.py (HAPPY) <img src="readme_images/HAPPYPlacenta.png" width="100" align="right" />
 
+## [HAPPYv2.0 UPDATE Sept 2025](#big-tile-approad-and-testing-instruction-for-cell-inference)
+HAPPY now has a new way to fetch images for nuclei and cell inferencing, and an updated graph model design. Model weights will work with the nuclei + cell models still, but requires the updated graph model weights or retraining.
+
 ## Overview
 
 Accompanying repository for **HAPPY: A deep learning pipeline for mapping cell-to-tissue 
 graphs across placenta histology whole slide images**. 
-
-
-## [HAPPYv2.0 UPDATE Sept 2025](#big-tile-approad-and-testing-instruction-for-cell-inference)
-HAPPY now has a new way to fetch images for nuclei and cell inferencing, and an updated graph model design. Model weights will work with the nuclei + cell models still, btu requires the updated graph model weights or retraining.
 
 <img src="readme_images/Figure1.png" width="490" align="right" />
 
@@ -257,3 +256,4 @@ training data in `analysis/evaluation/vis_groundtruth_nuclei.py`, regions of the
 graph in `analysis/evaluation/vis_graph_patch.py`, and the ground truth tissue points 
 
 in `analysis/evaluation/vis_groundtruth_graph.py`.
+
