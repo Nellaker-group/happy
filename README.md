@@ -74,25 +74,6 @@ If you would rather install a different version of pytorch for your cuda version
 please change the first two lines as per library instructions.
 Makefile provides targets for CPU and different CUDA versions.
 
-### Troubleshooting
-
-Installing javabridge can sometimes be a little tricky on MacOS. If you get a 
-'jvm not found' or 'jni.h not found' style error then you need to locate your 
-java installation and export it. For example, if you installed java with homebrew you 
-can:
-
-```bash
-export JAVA_HOME=/usr/local/opt/openjdk
-```
-
-If you then get a error with 'module = PyImport_ImportModuleLevelObject' you can 
-install this fork of javabridge which fixes it:
-
-```bash
-pip install git+https://github.com/LeeKamentsky/python-javabridge.git#egg=javabridge
-```
-
-
 ## Project Setup
 
 The core code is organ-agnostic and may be used for any organ histology analysis. 
@@ -268,6 +249,7 @@ HAPPY now use a new way to fetch images tiles from the WSI!
         
 <ins>After</ins>: Readers now fetched a large (default 15000px by 15000px) tile from the WSI to the CPU first, then crop the corresponding small tiles from the big tiles in the CPU
 before sending the small tiles to the GPU for inferencinbg.
+
 
 
 
