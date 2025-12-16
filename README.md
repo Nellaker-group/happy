@@ -3,7 +3,7 @@
 ## [HAPPYv2.0 UPDATE Sept 2025](#update-to-happyv2)
 HAPPY now has a new way to fetch images for nuclei and cell inferencing, and an improved graph model design for tissue inferencing. 
 
-TLDR: previous graph models are no longer compatible due to architecture changes. Graph retraining or downloading new placenta tissue graph model weights.
+TLDR: previous graph models are no longer compatible due to architecture changes. Graph retraining or downloading new placenta tissue graph [model weights](https://drive.google.com/drive/folders/1NZx4xqW1CdMUgDhyTkMBUg45pC0msAhq?usp=sharing).
 
 ## Overview
 
@@ -84,7 +84,7 @@ extending the core happy code by adding a new project to `projects/{project_name
 using `projects/placenta` as a template.
 
 If you would like to use the placenta histology training data and trained models from 
-the paper, you may download the data from [this link](https://drive.google.com/drive/folders/1RvSQOxsWyUHf_SGV1Jzqa_Gc5QI4wQoy?usp=sharing). 
+the paper, you may download the data from [this link](https://drive.google.com/drive/folders/1NZx4xqW1CdMUgDhyTkMBUg45pC0msAhq?usp=sharing). 
 Keeping the same directory structure as in the link, place each directory into 
 `projects/placenta`. This will allow you to train and evaluate all three models. For
 a WSI inference demo, place the sample WSI section under 
@@ -314,6 +314,7 @@ Also integrates (histolab)[https://histolab.readthedocs.io/en/latest/tissue_mask
 
 Updates: added `--standardise` flag to normalise embeddings (zero mean, unit variance) before training instead of using raw embeddings as node features. This gives an easy performance boost.
 Improved the clusterGCN to mimic the cell model's final layers including adding batch normalisation.
+
 
 
 
