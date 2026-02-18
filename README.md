@@ -1,5 +1,7 @@
 # Histology Analysis Pipeline.py (HAPPY) <img src="readme_images/HAPPYPlacenta.png" width="100" align="right" />
 
+v2.0 - some instability noted for v2.0, use v1.0 if trouble using.
+
 ## [HAPPYv2.0 UPDATE Sept 2025](#update-to-happyv2)
 HAPPY now has a new way to fetch images for nuclei and cell inferencing, and an improved graph model design for tissue inferencing. 
 
@@ -314,6 +316,7 @@ Also integrates (histolab)[https://histolab.readthedocs.io/en/latest/tissue_mask
 
 Updates: added `--standardise` flag to normalise embeddings (zero mean, unit variance) before training instead of using raw embeddings as node features. This gives an easy performance boost.
 Improved the clusterGCN to mimic the cell model's final layers including adding batch normalisation.
+
 
 
 
