@@ -266,7 +266,7 @@ python happy/db/add_single_slide.py \
 python happy/db/add_model.py \
     --path-to-model <PATH_TO_MODEL_FOLDER>/nuclei_model_f1_0.856.pt \
     --model-performance 0.856 \
-    --run-name placenta_nuc_model \
+    --run-name placenta_nuc_pretrained \
     --run-type Nuclei \
     --num-epochs 60 \
     --batch-size 16 \
@@ -278,7 +278,7 @@ python happy/db/add_model.py \
     --db-name main.db \
     --path-to-model <PATH_TO_MODEL_FOLDER>/cell_model_accuracy_0.8472.pt \
     --model-performance 0.85 \
-    --run-name pretrained_HAPPY \
+    --run-name placenta_cell_pretrained \
     --run-type Cell \
     --num-epochs 100 \
     --batch-size 400 \
@@ -363,6 +363,7 @@ Also integrates (histolab)[https://histolab.readthedocs.io/en/latest/tissue_mask
 
 Updates: added `--standardise` flag to normalise embeddings (zero mean, unit variance) before training instead of using raw embeddings as node features. This gives an easy performance boost.
 Improved the clusterGCN to mimic the cell model's final layers including adding batch normalisation.
+
 
 
 
