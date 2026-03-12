@@ -240,25 +240,72 @@ below for an example.
 
 <img src="readme_images/demo_sample.png" width="300" align="right" />
 
+Before starting the Demo Walkthrough, check if you have activate your venv.
+If not, run
+```bash
+source startup_scripts.sh
+```
+
 1) Setup model weights
 Save the nuclei and cell model weights under `projects/placenta/trained_models/`
-These mdoels have the IDs in the database (e.g. nuc model = 1, cell model = 2)
-Save the tissue model under `projects/placenta/results/graph/sup_clustergcn/demo_tissue/demo_timestamp`
    
-2) Add the demo slide section at `projects/placenta/slides/sample_wsi.tif` to 
-the database using:
+2) Add the demo slide to the database using:
 
 ```bash
 CWD=$(pwd) # save absolute current working directory
-python happy/db/add_slides.py \
-    --slides-dir "$CWD/projects/placenta/slides/" \
+python happy/db/add_single_slide.py \
+    --filename <PATH_TO_DEMO_SLIDE> \
     --lab-country na \
     --primary-contact na \
-    --slide-file-format .tif \
-    --pixel-size 0.2277
+    --slide-file-format <DEMO_SLIDE_FORMAT> \
+    --pixel-size <DEMO_SLIDE_PIXEL_SIZE> 
 ```
 
-3) Run the nuclei and cell inference pipeline on this sample:
+3) Add nuclei and cell models to database
+```bash
+python happy/db/add_model.py \
+    --path-to-model <PATH_TO_MODEL_FOLDER>/nuclei_model_f1_0.856.pt \
+    --model-performance 0.856 \
+    --run-name placenta_nuc_model \
+    --run-type Nuclei \
+    --num-epochs 60 \
+    --batch-size 16 \
+    --init-lr 0.0001 \
+    --model-architecture retinanet
+
+
+python happy/db/add_model.py \
+    --db-name main.db \
+    --path-to-model <PATH_TO_MODEL_FOLDER>/cell_model_accuracy_0.8472.pt \
+    --model-performance 0.85 \
+    --run-name pretrained_HAPPY \
+    --run-type Cell \
+    --num-epochs 100 \
+    --batch-size 400 \
+    --init-lr 0.0001 \
+    --lr-step 20 \
+    --model-architecture resnet-50
+```
+
+
+4) Check slide id and model id
+```bash
+sqlite3 happy/db/main.db
+
+# Check nuc model id:
+SELECT id FROM model WHERE path LIKE '%nuclei_model_f1_0.856.pt%';
+
+# Check cell model id:
+SELECT id FROM model WHERE path LIKE '%cell_model_accuracy_0.8498.pt%';
+
+# Check slide id:
+
+SELECT id FROM slide WHERE slide_name LIKE '<DEMO_SLIDE_NAME>';
+
+# Exit sqlite
+.exit
+```  
+5) Run the nuclei and cell inference pipeline on this sample:
 
 ```bash
 python cell_inference.py \
@@ -270,7 +317,7 @@ python cell_inference.py \
     --cell-batch-size 100
 ```
 
-4) Run the graph tissue inference pipeline on the nuclei and cell predictions:
+6) Run the graph tissue inference pipeline on the nuclei and cell predictions:
 
 ```bash
 python graph_inference.py \
@@ -316,6 +363,7 @@ Also integrates (histolab)[https://histolab.readthedocs.io/en/latest/tissue_mask
 
 Updates: added `--standardise` flag to normalise embeddings (zero mean, unit variance) before training instead of using raw embeddings as node features. This gives an easy performance boost.
 Improved the clusterGCN to mimic the cell model's final layers including adding batch normalisation.
+
 
 
 
