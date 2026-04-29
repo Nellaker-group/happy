@@ -12,6 +12,8 @@ TLDR: previous graph models are no longer compatible due to architecture changes
 Accompanying repository for **HAPPY: A deep learning pipeline for mapping cell-to-tissue 
 graphs across placenta histology whole slide images**. 
 
+Data access: [here](https://drive.google.com/drive/folders/1NZx4xqW1CdMUgDhyTkMBUg45pC0msAhq?usp=sharing). 
+
 <img src="readme_images/Figure1.png" width="490" align="right" />
 
 **Abstract**: _Accurate placenta pathology assessment is essential for managing maternal 
