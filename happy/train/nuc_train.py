@@ -1,15 +1,11 @@
-import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
 
 import numpy as np
 import pandas as pd
-import torch
 import yaml
 from ultralytics import YOLO
-
-from happy.logger.benchmark_logger import BenchmarkLogger
 
 
 _WEIGHTS_CACHE = Path.home() / ".cache" / "ultralytics"
@@ -66,11 +62,10 @@ class YoloConfig:
     fitness_recall_w: float = 0.15  # weight on recall (finding nuclei)
 
 
-def train_yolo(cfg: YoloConfig, run_path: Path) -> tuple[Path, Path, BenchmarkLogger]:
-    """Train a YOLO model and return (best_weights, last_weights, BenchmarkLogger).
+def train_yolo(cfg: YoloConfig, run_path: Path) -> tuple[Path, Path]:
+    """Train a YOLO model and return (best_weights, last_weights).
 
     Ultralytics output is written directly into run_path/yolo_output/.
-    Per-epoch time and GPU memory are captured via callbacks.
     """
     # want nucleus centroids, not tight boxes, so select best.pt (and
     # early-stop) on detection quality instead of yolos' default fitness of
@@ -87,30 +82,6 @@ def train_yolo(cfg: YoloConfig, run_path: Path) -> tuple[Path, Path, BenchmarkLo
 
     weights = _resolve_weights(cfg.pre_trained if cfg.pre_trained else cfg.model_name)
     model = YOLO(weights)
-
-    epoch_times: list[float] = []
-    epoch_memory_mb: list[float] = []
-    _epoch_start: list[float] = []
-
-    def on_train_start(trainer):
-        _save_architecture(trainer.model, run_path)
-
-    def on_train_epoch_start(trainer):
-        if torch.cuda.is_available():
-            torch.cuda.reset_peak_memory_stats()
-        _epoch_start.append(time.monotonic())
-
-    def on_train_epoch_end(trainer):
-        epoch_times.append(time.monotonic() - _epoch_start[-1])
-        epoch_memory_mb.append(
-            torch.cuda.max_memory_allocated() / 1024 / 1024
-            if torch.cuda.is_available()
-            else float("nan")
-        )
-
-    model.add_callback("on_train_start", on_train_start)
-    model.add_callback("on_train_epoch_start", on_train_epoch_start)
-    model.add_callback("on_train_epoch_end", on_train_epoch_end)
 
     try:
         model.train(
@@ -148,71 +119,24 @@ def train_yolo(cfg: YoloConfig, run_path: Path) -> tuple[Path, Path, BenchmarkLo
         )
     except Exception as e:
         print(f"Training interrupted: {e}")
-        print("Attempting to salvage partial metrics from results.csv...")
 
     best_weights = run_path / "yolo_output" / "weights" / "best.pt"
     last_weights = run_path / "yolo_output" / "weights" / "last.pt"
-
-    bench = _build_benchmark_logger(model, epoch_times, epoch_memory_mb)
-    return best_weights, last_weights, bench
+    return best_weights, last_weights
 
 
-def _save_architecture(model, run_path: Path):
-    try:
-        info = model.info(verbose=False) if hasattr(model, "info") else None
-        if info is None:
-            return
-        layers, params, _, gflops = info
-        pd.DataFrame([{
-            "layers": int(layers),
-            "parameters": int(params),
-            "gflops": round(float(gflops), 1),
-        }]).to_csv(run_path / "architecture.csv", index=False)
-    except Exception as e:
-        print(f"WARNING: could not save architecture info — {e}")
+def read_best_metrics(run_path: Path) -> tuple[float, int]:
+    """Read best mAP@0.5 and number of epochs run from ultralytics' results.csv.
 
-
-def _build_benchmark_logger(
-    model, epoch_times: list[float], epoch_memory_mb: list[float]
-):
-    bench = BenchmarkLogger()
-
-    results_csv = Path(model.trainer.save_dir) / "results.csv"
+    Returns (best_map50, num_epochs); (0.0, 0) if results.csv is missing.
+    """
+    results_csv = run_path / "yolo_output" / "results.csv"
     if not results_csv.exists():
-        return bench
-
+        return 0.0, 0
     df = pd.read_csv(results_csv)
     df.columns = df.columns.str.strip()
-
-    try:
-        train_size = len(model.trainer.train_loader.dataset)
-    except Exception:
-        train_size = None
-
-    col_map = {
-        "train/box_loss": "train_box_loss",
-        "train/cls_loss": "train_cls_loss",
-        "val/box_loss": "val_box_loss",
-        "val/cls_loss": "val_cls_loss",
-        "metrics/mAP50(B)": "mAP50",
-        "metrics/mAP50-95(B)": "mAP50_95",
-        "metrics/precision(B)": "precision",
-        "metrics/recall(B)": "recall",
-    }
-
-    for i, (_, row) in enumerate(df.iterrows()):
-        epoch = int(row.get("epoch", 0)) + 1
-        epoch_t = epoch_times[i] if i < len(epoch_times) else float("nan")
-        gpu_mb = epoch_memory_mb[i] if i < len(epoch_memory_mb) else float("nan")
-        metrics = {"epoch_time_s": epoch_t, "gpu_memory_mb": gpu_mb}
-        if train_size is not None and not (epoch_t != epoch_t):  # not nan
-            metrics["imgs_per_sec"] = train_size / epoch_t
-        for src, dst in col_map.items():
-            if src in row:
-                metrics[dst] = float(row[src])
-        bench.log_epoch(epoch, metrics)
-
-    return bench
+    best_map50 = float(df["metrics/mAP50(B)"].max()) if "metrics/mAP50(B)" in df else 0.0
+    return best_map50, len(df)
 
 
 # ---------------------------------------------------------------------------
@@ -259,73 +183,3 @@ def merge_yamls(yaml_paths: List[str], run_path: Path) -> str:
 
     print(f"Combined YAML ({len(yaml_paths)} datasets) written to {out_path}")
     return str(out_path)
-
-
-# ---------------------------------------------------------------------------
-# Stitching benchmark metrics across resumed runs
-# ---------------------------------------------------------------------------
-
-_YOLO_COL_MAP = {
-    "train/box_loss": "train_box_loss",
-    "train/cls_loss": "train_cls_loss",
-    "val/box_loss": "val_box_loss",
-    "val/cls_loss": "val_cls_loss",
-    "metrics/mAP50(B)": "mAP50",
-    "metrics/mAP50-95(B)": "mAP50_95",
-    "metrics/precision(B)": "precision",
-    "metrics/recall(B)": "recall",
-}
-
-
-def load_prev_benchmark(run_dir: Path):
-    """Load benchmark metrics from a previous run.
-
-    Prefers benchmark_metrics.csv; falls back to yolo_output/results.csv if the
-    run timed out before our benchmark code could write (timing/memory will be NaN).
-    """
-    bench_csv = run_dir / "benchmark_metrics.csv"
-    if bench_csv.exists():
-        return pd.read_csv(bench_csv)
-
-    yolo_csv = run_dir / "yolo_output" / "results.csv"
-    if not yolo_csv.exists():
-        return None
-
-    print(f"WARNING: benchmark_metrics.csv not found in {run_dir} — falling back to "
-          f"yolo_output/results.csv (epoch_time_s / gpu_memory_mb will be NaN).")
-    raw = pd.read_csv(yolo_csv)
-    raw.columns = raw.columns.str.strip()
-    rows = []
-    for _, row in raw.iterrows():
-        r = {"epoch": int(row.get("epoch", 0)) + 1,
-             "epoch_time_s": float("nan"),
-             "gpu_memory_mb": float("nan"),
-             "imgs_per_sec": float("nan")}
-        for src, dst in _YOLO_COL_MAP.items():
-            if src in row:
-                r[dst] = float(row[src])
-        rows.append(r)
-    return pd.DataFrame(rows)
-
-
-def stitch_benchmarks(previous_run_dir: str, current_bench: BenchmarkLogger) -> BenchmarkLogger:
-    """Prepend a previous run's benchmark metrics to the current run's logger.
-
-    Epoch numbers in the current run are offset so they continue
-    from where the previous run left off.
-    """
-    prev_df = load_prev_benchmark(Path(previous_run_dir))
-    if prev_df is None:
-        print(f"WARNING: No benchmark data found in {previous_run_dir} — benchmark will cover this run only.")
-        return current_bench
-    epoch_offset = int(prev_df["epoch"].max())
-
-    current_df = current_bench.to_df()
-    current_df["epoch"] = current_df["epoch"] + epoch_offset
-
-    combined_df = pd.concat([prev_df, current_df], ignore_index=True)
-
-    stitched = BenchmarkLogger()
-    for _, row in combined_df.iterrows():
-        stitched.log_epoch(int(row["epoch"]), row.to_dict())
-    return stitched

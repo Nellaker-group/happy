@@ -1,9 +1,10 @@
+import time
 from pathlib import Path
 from typing import List, Optional
 
 import typer
 
-from happy.train.nuc_train import YoloConfig, train_yolo, merge_yamls, stitch_benchmarks
+from happy.train.nuc_train import YoloConfig, train_yolo, merge_yamls, read_best_metrics
 from happy.train.hyperparameters import NucHyperparameters
 from happy.train import utils
 from happy.utils.utils import get_project_dir
@@ -17,7 +18,6 @@ def main(
     data: List[str] = typer.Option(..., help="Path to dataset YAML. Pass multiple times to train a joint model across organs."),
     model_name: str = typer.Option("yolo26n.pt", help="YOLO model variant or path to weights"),
     pre_trained: Optional[str] = typer.Option(None, help="Path to local weights to resume from (instead model name)"),
-    previous_run_dir: Optional[str] = typer.Option(None, help="Path to a previous run dir"),
     num_workers: int = typer.Option(4),
     epochs: int = typer.Option(100),
     batch: int = typer.Option(8),
@@ -28,7 +28,6 @@ def main(
     optimiser: str = typer.Option("AdamW", help="Optimiser: AdamW or SGD"),
     device: str = typer.Option("cuda"),
     single_cls: bool = typer.Option(True, help="Treat all classes as one (e.g. as with single nuc detection)"),
-    benchmark: bool = typer.Option(True, help="Save benchmark CSV and figures"),
     seed: int = typer.Option(0, help="Random seed for reproducibility"),
     add_to_db: bool = typer.Option(False, help="Save nuc model to database"),
     get_cuda_device_num: bool = typer.Option(False, help="Auto-select GPU device"),
@@ -44,9 +43,6 @@ def main(
             give multiple flags with new ds for multidataset training
         model_name: YOLO model variant (e.g. yolo26n.pt, yolo26s.pt) or path to weights
         pre_trained: path to local weights to resume from instead of model_name
-        previous_run_dir: path to the run directory of a prior training session — its
-            benchmark_metrics.csv is prepended to this run's metrics so figures and CSVs
-            cover the full training history end-to-end if it timeed out before completition
         num_workers: number of dataloader workers
         epochs: number of epochs to train for
         batch: batch size
@@ -56,7 +52,6 @@ def main(
         patience: early stopping patience
         optimiser: AdamW or SGD
         device: cuda, cpu, or GPU index
-        benchmark: whether to save benchmark CSV and matplotlib figures
         add_to_db: save nuc model to database
         get_cuda_device_num: auto-select a free GPU or give number
     """
@@ -65,8 +60,6 @@ def main(
     data = [str(Path(d).resolve()) for d in data]
     if pre_trained:
         pre_trained = str(Path(pre_trained).resolve())
-    if previous_run_dir:
-        previous_run_dir = str(Path(previous_run_dir).resolve())
 
     if get_cuda_device_num:
         import torch
@@ -123,29 +116,24 @@ def main(
         f"model={hp.model_name}"
     )
 
+    start = time.time()
     try:
-        best_weights, last_weights, bench = train_yolo(cfg, run_path)
+        best_weights, last_weights = train_yolo(cfg, run_path)
     except KeyboardInterrupt:
         save_hp = input("Would you like to save the hyperparameters anyway? y/n: ")
         if save_hp == "y":
             hp.to_csv(run_path)
         return
-
-    # logs statistics to plot (stiches previous runs together if required)
-    if benchmark:
-        if previous_run_dir:
-            bench = stitch_benchmarks(previous_run_dir, bench)
-        bench.save_csv(run_path)
-        bench.save_figures(run_path)
-        print(f"Benchmark metrics saved to {run_path}")
+    train_time = time.time() - start
+    print(f"Training time: {train_time:.1f}s ({train_time / 60:.1f} min)")
 
     if add_to_db:
-        best_map50 = bench.best_metric("mAP50") if best_weights.exists() else 0.0
+        best_map50, num_epochs = read_best_metrics(run_path)
         train_run = TrainRun.create(
             run_name=exp_name,
             type="Nuclei",
             pre_trained_path=pre_trained or "",
-            num_epochs=bench.num_epochs(),
+            num_epochs=num_epochs,
             batch_size=hp.batch,
             init_lr=hp.learning_rate,
             lr_step=None,
