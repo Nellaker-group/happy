@@ -1,115 +1,167 @@
+from pathlib import Path
 from typing import List, Optional
-import os
 
 import typer
 
-from happy.train.hyperparameters import Hyperparameters
-from happy.utils.utils import get_device, get_project_dir
-from happy.logger.logger import Logger
-from happy.train import nuc_train, utils
+from happy.train.nuc_train import YoloConfig, train_yolo, merge_yamls, stitch_benchmarks
+from happy.train.hyperparameters import NucHyperparameters
+from happy.train import utils
+from happy.utils.utils import get_project_dir
+from happy.db.models_training import Model, TrainRun
+import happy.db.eval_runs_interface as db
 
 
 def main(
     project_name: str = typer.Option(...),
     exp_name: str = typer.Option(...),
-    annot_dir: str = typer.Option(...),
-    dataset_names: List[str] = typer.Option([]),
-    model_name: str = "retinanet",
-    pre_trained: Optional[str] = None,
-    num_workers: int = 20,
-    epochs: int = 20,
-    batch: int = 16,
-    val_batch: int = 16,
-    learning_rate: float = 1e-4,
-    decay_gamma: float = 1,
-    step_size: int = 20,
-    init_from_inc: bool = False,
-    frozen: bool = True,
-    vis: bool = False,
+    data: List[str] = typer.Option(..., help="Path to dataset YAML. Pass multiple times to train a joint model across organs."),
+    model_name: str = typer.Option("yolo26n.pt", help="YOLO model variant or path to weights"),
+    pre_trained: Optional[str] = typer.Option(None, help="Path to local weights to resume from (instead model name)"),
+    previous_run_dir: Optional[str] = typer.Option(None, help="Path to a previous run dir"),
+    num_workers: int = typer.Option(4),
+    epochs: int = typer.Option(100),
+    batch: int = typer.Option(8),
+    imgsz: int = typer.Option(1280, help="Image size (must be multiple of 32)"),
+    learning_rate: float = typer.Option(0.001),
+    weight_decay: float = typer.Option(0.0005),
+    patience: int = typer.Option(20, help="Early stopping patience in epochs"),
+    optimiser: str = typer.Option("AdamW", help="Optimiser: AdamW or SGD"),
+    device: str = typer.Option("cuda"),
+    single_cls: bool = typer.Option(True, help="Treat all classes as one (e.g. as with single nuc detection)"),
+    benchmark: bool = typer.Option(True, help="Save benchmark CSV and figures"),
+    seed: int = typer.Option(0, help="Random seed for reproducibility"),
+    add_to_db: bool = typer.Option(False, help="Save nuc model to database"),
+    get_cuda_device_num: bool = typer.Option(False, help="Auto-select GPU device"),
 ):
-    """For training a nuclei detection model
+    """Train a nuclei detection model.
 
-    Multiple datasets can be combined by passing in 'dataset_names' multiple times with
-    the correct datasets directory name.
-
-    Visualising the batch and epoch level training stats requires having a visdom
-    server running on port 8998.
+    To resume, give pre trained model path instead of model name
 
     Args:
         project_name: name of the project dir to save results to
         exp_name: name of the experiment directory to save results to
-        annot_dir: relative path to annotations
-        dataset_names: name of directory containing one datasets
-        model_name: architecture name (currently just 'retinanet')
-        pre_trained: path to pretrained weights if starting from local weights
-        num_workers: number of workers for parallel processing
+        data: path to the dataset YAML file defining train/val/test splits from the project dir.
+            give multiple flags with new ds for multidataset training
+        model_name: YOLO model variant (e.g. yolo26n.pt, yolo26s.pt) or path to weights
+        pre_trained: path to local weights to resume from instead of model_name
+        previous_run_dir: path to the run directory of a prior training session — its
+            benchmark_metrics.csv is prepended to this run's metrics so figures and CSVs
+            cover the full training history end-to-end if it timeed out before completition
+        num_workers: number of dataloader workers
         epochs: number of epochs to train for
-        batch: batch size of the training set
-        val_batch: batch size of the validation sets
-        learning_rate: learning rate which decreases every 8 epochs
-        decay_gamma: amount to decay learning rate by. Set to 1 for no decay.
-        step_size: epoch at which to apply learning rate decay.
-        init_from_inc: whether to use imagenet pretrained weights
-        frozen: whether to freeze most of the layers. True for only fine-tuning
-        vis: whether to send stats to visdom for visualisation
+        batch: batch size
+        imgsz: input image size (must be a multiple of 32) - maxs square and black pads, bigger = more memory onto gpu
+        learning_rate: initial learning rate
+        weight_decay: L2 regularisation
+        patience: early stopping patience
+        optimiser: AdamW or SGD
+        device: cuda, cpu, or GPU index
+        benchmark: whether to save benchmark CSV and matplotlib figures
+        add_to_db: save nuc model to database
+        get_cuda_device_num: auto-select a free GPU or give number
     """
-    device = get_device()
 
-    hp = Hyperparameters(
-        exp_name,
-        annot_dir,
-        dataset_names,
-        model_name,
-        pre_trained,
-        epochs,
-        batch,
-        learning_rate,
-        init_from_inc,
-        frozen,
+    # Resolve paths
+    data = [str(Path(d).resolve()) for d in data]
+    if pre_trained:
+        pre_trained = str(Path(pre_trained).resolve())
+    if previous_run_dir:
+        previous_run_dir = str(Path(previous_run_dir).resolve())
+
+    if get_cuda_device_num:
+        import torch
+        device = str(torch.cuda.current_device())
+
+    if add_to_db:
+        db.init("main.db")
+
+    hp = NucHyperparameters(
+        exp_name=exp_name,
+        data="|".join(data),
+        model_name=model_name,
+        pre_trained=pre_trained,
+        epochs=epochs,
+        batch=batch,
+        imgsz=imgsz,
+        learning_rate=learning_rate,
+        weight_decay=weight_decay,
+        patience=patience,
+        optimiser=optimiser,
+        workers=num_workers,
+        seed=seed,
     )
-    multiple_val_sets = True if len(hp.dataset_names) > 1 else False
+
     project_dir = get_project_dir(project_name)
-    os.chdir(str(project_dir))
-
-    # Setup the model. Can be pretrained from coco or own weights.
-    model = nuc_train.setup_model(hp.init_from_inc, device, frozen, pre_trained)
-
-    # Get all datasets and dataloaders, including separate validation datasets
-    dataloaders = nuc_train.setup_data(
-        project_dir / annot_dir, hp, multiple_val_sets, num_workers, val_batch
-    )
-
-    # Setup training parameters
-    optimizer, scheduler = nuc_train.setup_training_params(
-        model, hp.learning_rate, decay_gamma, step_size
-    )
-
-    # Setup recording of stats per batch and epoch
-    logger = Logger(
-        list(dataloaders.keys()), ["loss", "Precision", "Recall", "F1"], vis
-    )
-
-    # Save each run by it's timestamp
     run_path = utils.setup_run(project_dir, exp_name, "nuclei")
+    hp.to_csv(run_path)
 
-    # train!
+    # merge yamls if multiple datasets
+    data_yaml = merge_yamls(data, run_path) if len(data) > 1 else data[0]
+
+    cfg = YoloConfig(
+        data=data_yaml,
+        model_name=hp.model_name,
+        pre_trained=hp.pre_trained,
+        epochs=hp.epochs,
+        imgsz=hp.imgsz,
+        batch=hp.batch,
+        device=device,
+        workers=hp.workers,
+        optimizer=hp.optimiser,
+        lr0=hp.learning_rate,
+        weight_decay=hp.weight_decay,
+        patience=hp.patience,
+        project=project_name,
+        name=exp_name,
+        single_cls=single_cls,
+        seed=hp.seed,
+    )
+
+    print(
+        f"Training YOLO nuclei detection for {hp.epochs} epochs, "
+        f"lr={hp.learning_rate}, batch={hp.batch}, imgsz={hp.imgsz}, "
+        f"model={hp.model_name}"
+    )
+
     try:
-        print(f"Num training images: {len(dataloaders['train'].dataset)}")
-        print(
-            f"Training on datasets {hp.dataset_names} for {hp.epochs} epochs, "
-            f"with lr of {hp.learning_rate}, batch size {hp.batch}, and init from coco "
-            f"is {hp.init_from_inc}"
-        )
-        nuc_train.train(
-            epochs, model, dataloaders, optimizer, logger, scheduler, run_path, device
-        )
+        best_weights, last_weights, bench = train_yolo(cfg, run_path)
     except KeyboardInterrupt:
         save_hp = input("Would you like to save the hyperparameters anyway? y/n: ")
         if save_hp == "y":
             hp.to_csv(run_path)
+        return
 
-    # Save hyperparameters, the logged train stats, and the final model
-    nuc_train.save_state(logger, model, hp, run_path)
+    # logs statistics to plot (stiches previous runs together if required)
+    if benchmark:
+        if previous_run_dir:
+            bench = stitch_benchmarks(previous_run_dir, bench)
+        bench.save_csv(run_path)
+        bench.save_figures(run_path)
+        print(f"Benchmark metrics saved to {run_path}")
+
+    if add_to_db:
+        best_map50 = bench.best_metric("mAP50") if best_weights.exists() else 0.0
+        train_run = TrainRun.create(
+            run_name=exp_name,
+            type="Nuclei",
+            pre_trained_path=pre_trained or "",
+            num_epochs=bench.num_epochs(),
+            batch_size=hp.batch,
+            init_lr=hp.learning_rate,
+            lr_step=None,
+        )
+        model_record = Model.create(
+            train_run=train_run,
+            type="Nuclei",
+            path=str(best_weights.resolve()),
+            architecture="yolo26",
+            performance=round(best_map50, 4),
+        )
+        print(f"Model registered in DB with ID: {model_record.id}")
+
+    print(f"Best weights: {best_weights}")
+    print(f"Last weights: {last_weights}")
+    print(f"Run saved to: {run_path}")
 
 
 if __name__ == "__main__":

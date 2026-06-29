@@ -86,3 +86,57 @@ class Hyperparameters:
             self.init_from_inc = args.init_from_inc
         if args.frozen:
             self.frozen = args.frozen
+
+
+class NucHyperparameters:
+    """Hyperparameters for YOLO nuclei detection training, saved to params.csv."""
+
+    def __init__(
+        self,
+        exp_name,
+        data,
+        model_name,
+        pre_trained,
+        epochs,
+        batch,
+        imgsz,
+        learning_rate,
+        weight_decay,
+        patience,
+        optimiser,
+        workers,
+        seed,
+    ):
+        self.exp_name = exp_name
+        self.data = data
+        self.model_name = model_name
+        self.pre_trained = pre_trained
+        self.epochs = epochs
+        self.batch = batch
+        self.imgsz = imgsz
+        self.learning_rate = learning_rate
+        self.weight_decay = weight_decay
+        self.patience = patience
+        self.optimiser = optimiser
+        self.workers = workers
+        self.seed = seed
+
+    def to_csv(self, path):
+        d = {
+            "exp_name": [self.exp_name],
+            "data": [self.data],
+            "model_name": [self.model_name],
+            "pre_trained": [self.pre_trained],
+            "epochs": [self.epochs],
+            "batch": [self.batch],
+            "imgsz": [self.imgsz],
+            "learning_rate": [self.learning_rate],
+            "weight_decay": [self.weight_decay],
+            "patience": [self.patience],
+            "optimiser": [self.optimiser],
+            "workers": [self.workers],
+            "seed": [self.seed],
+        }
+        path = Path(path)
+        path.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame(d).to_csv(path / "params.csv", index=False)
