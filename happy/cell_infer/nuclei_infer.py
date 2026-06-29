@@ -13,6 +13,8 @@ from happy.data.transforms.transforms import Normalizer, Resizer
 from happy.db.msfile_interface import get_msfile
 import happy.db.eval_runs_interface as db
 
+from ultralytics import YOLO
+
 
 # Load model weights and push to device
 def setup_model(model_id, device):
@@ -25,24 +27,32 @@ def setup_model(model_id, device):
         state_dict = torch.load(model_weights_path)
         # Removes the module string from the keys if it's there.
         model = load_weights(state_dict, model)
+        model = model.to(device)
+    elif model_architecture == 'yolo26':
+        model = YOLO(model_weights_path)  # use yolo to load the model weight directly
     else:
         raise ValueError(f"{model_architecture} not supported")
 
-    model = model.to(device)
-    print("Pushed model to device")
-    return model
+    print(f"Pushed model {model_architecture} to device")
+    return model, model_architecture
 
 
 # Load datasets and dataloader
-def setup_data(slide_id, run_id, model_id, big_tile_size, batch_size, overlap, num_workers):
+def setup_data(slide_id, run_id, model_id, big_tile_size, batch_size, overlap, num_workers, model_architecture="retinanet"):
     ms_file = get_msfile(
         slide_id=slide_id, run_id=run_id, nuc_model_id=model_id, overlap=overlap
     )
     pred_saver = prediction_saver.PredictionSaver(ms_file)
     print("loading datasets")
     remaining_data = np.array(db.get_remaining_tiles(ms_file.id))
+    # RetinaNet requires ImageNet normalisation (pretrained ResNet backbone) and
+    # the Resizer to match its training resolution.
+    if model_architecture == "retinanet":
+        transform = transforms.Compose([Normalizer(), Resizer()])
+    else:
+        transform = None
     curr_data_set = NucleiDataset(
-        ms_file, remaining_data, big_tile_size, transform=transforms.Compose([Normalizer(), Resizer()])
+        ms_file, remaining_data, big_tile_size, transform=transform
     )
     print("datasets loaded")
     print("creating dataloader")
@@ -58,8 +68,19 @@ def setup_data(slide_id, run_id, model_id, big_tile_size, batch_size, overlap, n
     return dataloader, pred_saver
 
 
-# Predict nuclei loop
+# Predict nuclei
 def run_nuclei_eval(
+    dataset, model, model_architecture, pred_saver, device, score_threshold, max_detections, verbose
+):
+    if model_architecture == "retinanet":
+        _run_retinanet_eval(dataset, model, pred_saver, device, score_threshold, max_detections, verbose)
+    elif model_architecture == "yolo26":
+        _run_yolo_eval(dataset, model, pred_saver, device, score_threshold, max_detections, verbose)
+    else:
+        raise ValueError(f"Unknown architecture for inference: {model_architecture}")
+
+
+def _run_retinanet_eval(
     dataset, model, pred_saver, device, score_threshold, max_detections, verbose
 ):
     # object for graceful shutdown. Current loop finishes on SIGINT or SIGTERM
@@ -68,12 +89,9 @@ def run_nuclei_eval(
     tiles_to_evaluate = db.get_num_remaining_tiles(pred_saver.id)
     model.eval()
     with torch.no_grad():
-        # startpoint=[]
-        # endpoint=[0]
         with tqdm(total=tiles_to_evaluate, disable=not verbose) as pbar:
 
             for batch in dataset:
-                # log_current_usage(f"batch start:")
                 if not killer.kill_now:
                     # find the indices in the batch which are and aren't empty tiles
                     empty_mask = np.array(batch["empty_tile"])
@@ -100,35 +118,110 @@ def run_nuclei_eval(
                         # Network can't be fed batches of images
                         # as it returns predictions in one array
                         for i, non_empty_ind in enumerate(non_empty_inds):
-                            # startpoint.append(time.time())
                             # run network on non-empty images/tiles
                             model_input = torch.from_numpy(
                                 np.expand_dims(non_empty_imgs[i], axis=0)
                             ).to(device)
 
-                            scores, labels, boxes = model(model_input, device)
+                            scores, _, boxes = model(model_input, device)
                             scores = scores.cpu().numpy()
                             boxes = boxes.cpu().numpy()
 
                             # Correct predictions from resizing of img.
                             boxes /= scale
-                            
+
                             # select indices which have a score above the threshold
                             image_boxes = pred_saver.filter_by_score(
                                 max_detections, score_threshold, scores, boxes
                             )
 
                             pred_saver.save_nuclei(non_empty_ind, image_boxes)
-                            #log_current_usage(f"Non-empty batch inference end:")
                             pbar.update()
-
-                            # endpoint.append(time.time())
-                    # time.sleep(1)  # Any pause between epochs
-                    # log_current_usage("Between loop:")
                 else:
                     early_break = True
                     break
                 torch.cuda.empty_cache()
+
+    if not early_break and not pred_saver.file.nucs_done:
+        pred_saver.apply_nuclei_post_processing(cluster=True, remove_edges=True)
+        pred_saver.commit_valid_nuclei_predictions()
+
+
+def _run_yolo_eval(
+    dataset, model, pred_saver, device, score_threshold, max_detections, verbose
+):
+    # object for graceful shutdown. Current loop finishes on SIGINT or SIGTERM
+    killer = GracefulKiller()
+    early_break = False
+    tiles_to_evaluate = db.get_num_remaining_tiles(pred_saver.id)
+
+    print("Running YOLO nuclei inference...")
+
+    # Run inference at the same imgsz the model was trained on, read from checkpoint
+    # if not, fall back to running on 1280 (resizes to this)
+    try:
+        train_imgsz = int(model.ckpt["train_args"]["imgsz"])
+    except Exception:
+        train_imgsz = 1280
+    print(f"YOLO inference imgsz={train_imgsz}")
+
+    # YOLO manages its own inference mode internally — no model.eval() / torch.no_grad() needed
+    with tqdm(total=tiles_to_evaluate, disable=not verbose) as pbar:
+
+        for batch in dataset:
+            if not killer.kill_now:
+                # find the indices in the batch which are and aren't empty tiles
+                empty_mask = np.array(batch["empty_tile"])
+                tile_indexes = np.array(batch["tile_index"])
+                empty_inds = tile_indexes[empty_mask]
+                non_empty_inds = tile_indexes[~empty_mask]
+
+                # if there are empty tiles in the batch, save them as empty
+                if empty_inds.size > 0:
+                    for empty_ind in empty_inds:
+                        pbar.update()
+                        pred_saver.save_empty([empty_ind])
+
+                # if there are non-empty tiles in the batch,
+                # eval model and save predictions
+                if non_empty_inds.size > 0:
+
+                    keep = ~torch.as_tensor(empty_mask)  # tiles that actually have an image
+
+                    imgs_list = [
+                        np.ascontiguousarray(
+                            (t.permute(1, 2, 0).numpy() * 255).astype(np.uint8)[:, :, ::-1]
+                        )
+                        for t in batch["img"][keep]
+                    ]
+
+                    # Single batched forward pass for all non-empty tiles
+                    results = model.predict(
+                        imgs_list, imgsz=train_imgsz, conf=score_threshold,
+                        iou=0.7, max_det=max_detections, device=device, verbose=False
+                    )
+
+                    # per-tile offset math + DB writes
+                    for non_empty_ind, res in zip(non_empty_inds, results):
+                        r = res.boxes  # this is a Boxes object
+
+                        if r is not None and len(r) > 0:
+                            boxes = r.xyxy.cpu().numpy()   # native 1600x1200 tile coords
+                            scores = r.conf.cpu().numpy()  # shape: (N,)
+                        else:
+                            boxes = np.empty((0, 4))
+                            scores = np.empty((0,))
+
+                        # select indices which have a score above the threshold
+                        image_boxes = pred_saver.filter_by_score(
+                            max_detections, score_threshold, scores, boxes
+                        )
+
+                        pred_saver.save_nuclei(non_empty_ind, image_boxes)
+                        pbar.update()
+            else:
+                early_break = True
+                break
 
     if not early_break and not pred_saver.file.nucs_done:
         pred_saver.apply_nuclei_post_processing(cluster=True, remove_edges=True)
