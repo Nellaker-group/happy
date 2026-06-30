@@ -39,7 +39,10 @@ class HDF5Dataset:
         dataset._load_hdf5_datasets(file_path, start, num_points)
         return dataset
 
-    def to_path(self, file_path):
+    def to_path(self, file_path, overwrite=False):
+        if os.path.isfile(file_path) and overwrite:
+            print(f"Overwriting existing file at {file_path}")
+            os.remove(file_path)
         if not os.path.isfile(file_path):
             total = len(self.cell_predictions)
             with h5py.File(file_path, "w-") as f:
@@ -82,12 +85,13 @@ class HDF5Dataset:
                     shape=(total,),
                     dtype="float16",
                 )
-                f.create_dataset(
-                    "edge_index",
-                    data=self.edge_index,
-                    shape=(2, self.edge_index.shape[1]),
-                    dtype="int32",
-                )
+                if self.edge_index is not None:
+                    f.create_dataset(
+                        "edge_index",
+                        data=self.edge_index,
+                        shape=(2, self.edge_index.shape[1]),
+                        dtype="int32",
+                    )
         else:
             print(f"File at {file_path} already exists, skipping saving")
 
