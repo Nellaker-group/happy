@@ -55,15 +55,15 @@ class PredictionSaver:
 
     # Cluster duplicate nuclei from overlapped tiles
     @staticmethod
-    def cluster_multi_detections(nuclei_preds, dist_threshold=9):
+    def cluster_multi_detections(nuclei_preds, dist_threshold=11):
         print("finding duplicate nuclei clusters to cluster into one")
         tree = sk.KDTree(nuclei_preds, metric="euclidean")
 
         # each element contains index of point and index of neighbours within radius
         all_nn_indices = tree.query_radius(nuclei_preds, r=dist_threshold)
 
-        # find all inds with at least one neighbour within radius and fewer than 5
-        dup_det_inds = [x for x in all_nn_indices if 1 < len(x) < 5]
+        # find all inds with at least one neighbour within radius and fewer than 6
+        dup_det_inds = [x for x in all_nn_indices if 1 < len(x) < 6]
 
         # remove identical entries (if there are two neighbours there will be 2 entries)
         unique_dup_det_inds = np.unique(
