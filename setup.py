@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name="happy",
-    version="2.0",
+    version="3",
     author="Nellaker Group",
     description="The Histology Analysis Pipeline.py (HAPPY)",
     long_description=long_description,
@@ -22,8 +22,8 @@ setup(
             "cell_infer=cell_inference:main",
             "nuc_train=nuc_train:main",
             "cell_train=cell_train:main",
-            "graph_infer=graph_inference:main",
-            "graph_train=graph_train:main",
+            "tissue_infer=tissue_inference:main",
+            "tissue_train=tissue_train:main",
         ]
     },
 )
