@@ -13,6 +13,7 @@ def init_db(db_name):
         UnvalidatedPrediction,
     )
     from happy.db.models_training import Model, TrainRun
+    from happy.db.graph_model import GraphModel
     from happy.db.tiles import (
         TrainTile,
         Annotation,
@@ -43,6 +44,7 @@ def init_db(db_name):
             TileState,
             Model,
             TrainRun,
+            GraphModel,
             TrainTile,
             Annotation,
             Feature,

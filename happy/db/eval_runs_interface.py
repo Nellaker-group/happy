@@ -6,6 +6,7 @@ from peewee import Tuple, ValuesList, EnclosedNodeList, chunked
 from happy.db.slides import Slide
 from happy.db.eval_runs import EvalRun, Prediction, TileState, UnvalidatedPrediction
 from happy.db.models_training import Model
+from happy.db.graph_model import GraphModel
 from happy.db.base import database, init_db
 
 
@@ -335,6 +336,45 @@ def copy_nuclei_predictions(run_id_to_copy):
             f"Copied {len(unvalidated_predictions)} unvalidated predictions "
             f"to new run {new_run_id}"
         )
+
+
+def get_tissue_embeddings_path(run_id, embeddings_dir=None):
+    eval_run = EvalRun.get_by_id(run_id)
+    base_dir = Path(embeddings_dir) if embeddings_dir else Path(".")
+
+    if not eval_run.tissue_embeddings_path:
+        slide = eval_run.slide
+        lab_id = slide.lab.id
+        slide_name = slide.slide_name
+
+        embeddings_path = Path(f"lab_{lab_id}") / f"slide_{slide_name}"
+        path_with_file = embeddings_path / f"run_{run_id}_tissues.hdf5"
+
+        (base_dir / embeddings_path).mkdir(parents=True, exist_ok=True)
+
+        EvalRun.update(tissue_embeddings_path=str(path_with_file)).where(EvalRun.id == run_id).execute()
+        return base_dir / path_with_file
+    else:
+        path = Path(eval_run.tissue_embeddings_path)
+        (base_dir / path).parent.mkdir(parents=True, exist_ok=True)
+        return base_dir / path
+
+
+def set_tissue_graph_params(run_id, k, graph_method):
+    EvalRun.update(k=k, graph_method=graph_method).where(EvalRun.id == run_id).execute()
+
+
+def get_tissue_model_path(tissue_model_id):
+    model = GraphModel.get_by_id(tissue_model_id)
+    return Path(model.path)
+
+
+def set_tissue_model(run_id, tissue_model_id):
+    EvalRun.update(tissue_model=tissue_model_id).where(EvalRun.id == run_id).execute()
+
+
+def mark_tissue_as_done(run_id):
+    EvalRun.update(tissue_done=True).where(EvalRun.id == run_id).execute()
 
 
 def delete_evalrun(run_id):
