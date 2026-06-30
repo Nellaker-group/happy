@@ -1,3 +1,4 @@
+import cv2
 import numpy as np
 import pandas as pd
 from PIL import Image
@@ -159,9 +160,12 @@ class MicroscopeFile:
     def _get_rescaled_img(self, x, y, w, h, target_w, target_h):
         orig_img = self.reader.get_img(x, y, int(w), int(h))
 
-        pil_orig_image = Image.fromarray(orig_img.astype("uint8"))
-        rescaled = pil_orig_image.resize([target_w, target_h])
-        return np.asarray(rescaled)
+        rescaled = cv2.resize(
+            orig_img.astype(np.uint8),
+            (int(target_w), int(target_h)),
+            interpolation=cv2.INTER_CUBIC,
+        )
+        return rescaled
 
     # Gets all (x,y) top left coords for all tiles in WSI with dimensions and overlap
     def _get_tile_xys(self, w, h, overlap):
@@ -216,9 +220,12 @@ class MicroscopeFile:
         point_saver=[]
         for i in range(0,num_tile_row):
             y_start = min_y + i*(tilesize-overlap)
-            y_end = y_start + tilesize 
-            x_start = min(df['x'].loc[(df['y']>=y_start) & (df['y']<=y_end)])-overlap
-            x_end = max(df['x'].loc[(df['y']>=y_start) & (df['y']<=y_end)])+overlap
+            y_end = y_start + tilesize
+            row_mask = (df['y']>=y_start) & (df['y']<=y_end)
+            if not row_mask.any():
+                continue
+            x_start = min(df['x'].loc[row_mask])-overlap
+            x_end = max(df['x'].loc[row_mask])+overlap
 
             #calculate how many tiles needed in one particular row
             num_tile_column = int((x_end - x_start)/(tilesize-overlap))
@@ -364,26 +371,27 @@ class MicroscopeFile:
     #with masking, check whether a nuclei tile is empty
     def check_nuc_tile_blank(self,nuc_xy,mask_array):
     
-        mask_df = pd.DataFrame(mask_array.tolist(),columns=['y','x'])
-        # nuc_xy is with WSI reference frame!!!!!!!!
+        # nuc_xy is in the WSI reference frame
+        if mask_array.size == 0:
+            # no masking array
+            return False
 
-        x_min=nuc_xy[0]
-        y_min=nuc_xy[1]
-        rescale_ratio = self.rescale_ratio
-        w=self.target_tile_width* rescale_ratio
-        h=self.target_tile_height* rescale_ratio
+        # Cache the mask coordinate columns 
+        if getattr(self, "_mask_y", None) is None:
+            self._mask_y = np.asarray(mask_array[:, 0])  # y column
+            self._mask_x = np.asarray(mask_array[:, 1])  # x column
 
-        x_max=x_min+w
-        y_max=y_min+h
+        x_min = nuc_xy[0]
+        y_min = nuc_xy[1]
+        w = self.target_tile_width * self.rescale_ratio
+        h = self.target_tile_height * self.rescale_ratio
 
-        check_df= mask_df[mask_df.y.between(left=y_min,right=y_max) &
-                        mask_df.x.between(left=x_min,right=x_max)]
-
-        empty_flag = False
-        if len(check_df) == 0:
-            empty_flag =True
-        
-        return empty_flag
+        # blank if no tissue-mask point falls inside the tile bounds
+        in_tile = (
+            (self._mask_y >= y_min) & (self._mask_y <= y_min + h)
+            & (self._mask_x >= x_min) & (self._mask_x <= x_min + w)
+        )
+        return not bool(in_tile.any())
     
     # first get all small nuc tile locations, treating them as cell xy locations (results then saved into the main.db)
     def get_nuc_small_tile_xy (self, mask_array,tile_overlap,tile_w,tile_h):
@@ -410,8 +418,13 @@ class MicroscopeFile:
         for i in range(0,num_tile_row):
             y_start = min_y + i*(h-overlap)
             y_end = y_start + h
-            x_start = min(df['x'].loc[(df['y']>=y_start) & (df['y']<=y_end)])-overlap
-            x_end = max(df['x'].loc[(df['y']>=y_start) & (df['y']<=y_end)])+overlap
+            row_x = df['x'].loc[(df['y']>=y_start) & (df['y']<=y_end)]
+            # skip row bands with no tissue-mask points (e.g. fragmented tissue
+            # with a horizontal gap) - otherwise min()/max() raise on empty input
+            if row_x.empty:
+                continue
+            x_start = row_x.min()-overlap
+            x_end = row_x.max()+overlap
 
             #calculate how many tiles needed in one particular row
             num_tile_column = int((x_end - x_start)/(w-overlap))
@@ -458,7 +471,6 @@ class MicroscopeFile:
                 #print(f'start of row {i}')
                 miny=self._safe_min(df,'y')
                 if miny is None:
-                    print("DataFrame is empty!")
                     break
                 y1= min(df['y']) + i*(tilesize - h)
                 y2= y1 + tilesize - h
