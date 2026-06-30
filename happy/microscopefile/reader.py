@@ -138,21 +138,40 @@ class OpenSlideFile(Reader):
         return self.reader.dimensions[1]
 
     def get_pixel_size(self, pixel_size):
-        """Try to get the pixel size dimensions out of the metadata"""
-        pix_x_size = False
+        """
+        Try to get the pixel size dimensions out of the metadata.
+        Robust to small floating-point differences between mpp-x and mpp-y.
+        Falls back to the provided `pixel_size` on failure.
+        """
         try:
-            pix_x_size = float(self.reader.properties["openslide.mpp-x"])
-            pix_y_size = float(self.reader.properties["openslide.mpp-y"])
-        except:
-            pass
-        if pix_x_size:
-            assert pix_x_size == pix_y_size
-            return pix_y_size
-        else:
+            # OpenSlide stores mpp in properties as strings
+            px = self.reader.properties.get("openslide.mpp-x", None)
+            py = self.reader.properties.get("openslide.mpp-y", None)
+            if px is None or py is None:
+                # property missing, fallback
+                return pixel_size
+
+            pix_x_size = float(px)
+            pix_y_size = float(py)
+
+            # Allow tiny rounding differences: treat as equal if nearly identical
+            if round(pix_x_size, 6) == round(pix_y_size, 6):
+                return float((pix_x_size + pix_y_size) / 2.0)
+            else:
+                # If they differ more than tiny rounding, log a warning and still return average
+                logging.warning(
+                    "openslide.mpp-x (%s) and openslide.mpp-y (%s) differ for %s — using average",
+                    pix_x_size,
+                    pix_y_size,
+                    getattr(self, "slide_path", "<slide>"),
+                )
+                return float((pix_x_size + pix_y_size) / 2.0)
+
+        except Exception as e:
+            logging.debug("Could not read openslide.mpp-* metadata: %s", e)
             return pixel_size
 
     def get_img(self, x, y, w, h, bound=True):
-        full_img = np.zeros((h, w, 3))
         bounded_w = w
         bounded_h = h
         x = int(min(self.max_slide_width - 1, x))
@@ -169,11 +188,14 @@ class OpenSlideFile(Reader):
         )
         avail_img = np.array(avail_img)[:, :, 0:3]
 
-        np.add(
-            full_img[:bounded_h, :bounded_w],
-            avail_img,
-            out=full_img[:bounded_h, :bounded_w],
-        )
+        # Normally the requested region lies fully inside the slide, so the
+        # read covers the whole tile — return it directly, no padding buffer.
+        if bounded_w == w and bounded_h == h:
+            return avail_img
+
+        # if region runs off the slide; pad the missing border with zeros.
+        full_img = np.zeros((h, w, 3), dtype=np.uint8)
+        full_img[:bounded_h, :bounded_w] = avail_img
         return full_img
 
 
