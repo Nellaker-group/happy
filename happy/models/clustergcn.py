@@ -4,6 +4,7 @@ import torch
 from torch_geometric.nn import SAGEConv, ClusterGCNConv, norm, JumpingKnowledge
 
 from happy.models.utils.custom_layers import WeightedSAGEConv
+from happy.models.gin import ClusterGIN # for old model loading
 
 
 class ClusterGCN(nn.Module):
@@ -63,21 +64,20 @@ class ClusterGCN(nn.Module):
         # immediately computing the final representations of each batch.
         for i, conv in enumerate(self.convs):
             xs = []
-            for batch_size, n_id, adj in subgraph_loader:
-                edge_index, _, size = adj.to(device)
-                x = x_all[n_id].to(device)
-                x_target = x[:size[1]]
-                x = conv((x, x_target), edge_index)
+            for batch in subgraph_loader:
+                x = x_all[batch.n_id.to(x_all.device)].to(device)
+                x = conv(x, batch.edge_index.to(device))
                 if i != len(self.convs) - 1 or self.reduce_dims is not None:
                     x = self.bns[i](x)
                     x = F.relu(x)
-                xs.append(x)
+                xs.append(x[:batch.batch_size].cpu())
             x_all = torch.cat(xs, dim=0)
 
             if i == self.num_layers - 2 and self.reduce_dims is None:
                 embeddings = x_all.detach().cpu().clone()
 
         if self.reduce_dims is not None:
+            x_all = x_all.to(device)
             x_all = self.lin1(x_all)
             x_all = self.lin_bn1(x_all)
             x_all = F.relu(x_all)
@@ -127,18 +127,16 @@ class JumpingClusterGCN(nn.Module):
         xs = []
         for i, conv in enumerate(self.convs):
             batch_xs = []
-            for batch_size, n_id, adj in subgraph_loader:
-                edge_index, _, size = adj.to(device)
-                x = x_all[n_id].to(device)
-                x_target = x[: size[1]]
-                x = conv((x, x_target), edge_index)
+            for batch in subgraph_loader:
+                x = x_all[batch.n_id.to(x_all.device)].to(device)
+                x = conv(x, batch.edge_index.to(device))
                 x = self.bns[i](x)
                 x = F.relu(x)
-                batch_xs.append(x)
+                batch_xs.append(x[:batch.batch_size].cpu())
             x_all = torch.cat(batch_xs, dim=0)
             xs.append(x_all)
 
-        x = self.jump(xs)
+        x = self.jump(xs).to(device)
         x = self.lin1(x)
         embeddings = x.detach().cpu().clone()
         x = F.relu(x)
@@ -231,28 +229,25 @@ class ClusterGCNEdges(nn.Module):
             x = self.lin2(x)
         return F.log_softmax(x, dim=-1)
 
-    def inference(self, x_all, edge_attr, subgraph_loader, device):
+    def inference(self, x_all, subgraph_loader, device):
         # Compute representations of nodes layer by layer, using *all*
         # available edges. This leads to faster computation in contrast to
         # immediately computing the final representations of each batch.
-        edge_attr = edge_attr.to(device)
         for i, conv in enumerate(self.convs):
             xs = []
-            for batch_size, n_id, adj in subgraph_loader:
-                edge_index, e_id, size = adj.to(device)
-                x = x_all[n_id].to(device)
-                edge_attr_batch = edge_attr[e_id].to(device)
-                x_target = x[:size[1]]
-                x = conv((x, x_target), edge_index, edge_attr_batch)
+            for batch in subgraph_loader:
+                x = x_all[batch.n_id.to(x_all.device)].to(device)
+                x = conv(x, batch.edge_index.to(device), batch.edge_attr.to(device))
                 if i != len(self.convs) - 1 or self.reduce_dims is not None:
                     x = F.relu(x)
-                xs.append(x)
+                xs.append(x[:batch.batch_size].cpu())
             x_all = torch.cat(xs, dim=0)
 
             if i == self.num_layers - 2 and self.reduce_dims is None:
                 embeddings = x_all.detach().cpu().clone()
 
         if self.reduce_dims is not None:
+            x_all = x_all.to(device)
             x_all = self.lin1(x_all)
             x_all = F.relu(x_all)
             embeddings = x_all.detach().cpu().clone()
