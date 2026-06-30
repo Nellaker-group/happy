@@ -28,16 +28,12 @@ def main(
     init_from_inc: bool = False,
     frozen: bool = True,
     weighted_loss: bool = False,
-    vis: bool = True,
     get_cuda_device_num: bool = False,
 ):
     """For training a cell classification model
 
     Multiple datasets can be combined by passing in 'dataset_names' multiple times with
     the correct datasets directory name.
-
-    Visualising the batch and epoch metrics during training requires having a visdom
-    server running on port 8998 (and vis=True).
 
     Args:
         project_name: name of the project dir to save results to
@@ -57,7 +53,6 @@ def main(
         init_from_inc: whether to use imagenet/coco pretrained weights
         frozen: whether to freeze most of the layers. True for only fine-tuning
         weighted_loss: whether to use weighted loss for imbalanced datasets
-        vis: whether to use visdom for visualisation
         get_cuda_device_num: True if you want the code to choose a gpu
     """
     device = get_device(get_cuda_device_num)
@@ -96,7 +91,7 @@ def main(
     )
 
     # Setup recording of stats for each datasets per batch and epoch
-    logger = Logger(list(dataloaders.keys()), ["loss", "accuracy"], vis)
+    logger = Logger(list(dataloaders.keys()), ["loss", "accuracy"])
 
     # Setup training parameters
     optimizer, criterion, scheduler = cell_train.setup_training_params(
