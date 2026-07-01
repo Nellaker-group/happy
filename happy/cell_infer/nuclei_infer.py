@@ -56,14 +56,16 @@ def setup_data(slide_id, run_id, model_id, big_tile_size, batch_size, overlap, n
     )
     print("datasets loaded")
     print("creating dataloader")
-    dataloader = DataLoader(
-        curr_data_set,
+    loader_kwargs = dict(
         num_workers=num_workers,
         collate_fn=collater,
         batch_size=batch_size,
-        prefetch_factor=2,
-        pin_memory=True
+        pin_memory=True,
     )
+    # prefetch_factor is only valid with worker processes (num_workers > 0)
+    if num_workers > 0:
+        loader_kwargs["prefetch_factor"] = 2
+    dataloader = DataLoader(curr_data_set, **loader_kwargs)
     print("dataloader ready")
     return dataloader, pred_saver
 
