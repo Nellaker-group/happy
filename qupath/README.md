@@ -112,6 +112,10 @@ To make them, draw **rectangle** annotations in QuPath with classes **`VAL_REGIO
 `x,y,width,height` to a CSV (`{slide}_val_patches.csv` / `{slide}_test_patches.csv`) in the
 project's `graph_splits/` dir, then pass them via `--val-patch-files` / `--test-patch-files`.
 
+- The VAL_REGION/TEST_REGION exporter (`GetValTestRegions.groovy`) is only needed for
+  spatially held-out evaluation — a normal random-split train doesn't require it.
+
+
 ---
 
 ## 5. Loading model predictions into QuPath
@@ -144,14 +148,3 @@ Then in QuPath:
 - **Whole WSI label mask:** use a `LabeledImageServer` script (`addLabel(class, value)` per
   class, `writeImage`) — order of labels matters.
 - **Small section:** set magnification, toggle **Show annotations**, export snapshot as SVG.
-
----
-
-## Notes / gaps
-
-- The manual steps above are the intended workflow; confirm exact menu names against your
-  QuPath version.
-- Set each script's `saveDir` to a real path (the committed scripts use a placeholder
-  `/../projects/...`).
-- The VAL_REGION/TEST_REGION exporter (`GetValTestRegions.groovy`) is only needed for
-  spatially held-out evaluation — a normal random-split train doesn't require it.
