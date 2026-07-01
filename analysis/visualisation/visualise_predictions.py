@@ -16,6 +16,8 @@ NUC_COLOUR = "black"
 def main(
     project_name: str = typer.Option(...),
     organ_name: str = typer.Option(...),
+    db_name: str = typer.Option("main.db", help="Database file in happy/db/, or an absolute path to a .db file"),
+    custom_embeddings_path: Optional[str] = typer.Option(None, help="Custom root path to the project embeddings (overrides default)"),
     eval_id: Optional[int] = typer.Option(
         None, help="Eval run id to plot (required for --nuc/--cell/--tissue)"
     ),
@@ -46,7 +48,7 @@ def main(
     if (nuc or cell or tissue) and eval_id is None:
         raise typer.BadParameter("--eval-id is required for --nuc/--cell/--tissue")
 
-    db.init()
+    db.init(db_name)
     organ = get_organ(organ_name)
     project_dir = get_project_dir(project_name)
 
@@ -72,7 +74,7 @@ def main(
 
     hdf5 = None
     if cell or tissue:
-        hdf5 = get_hdf5_data(project_name, eval_id, 0, 0, -1, -1, tissue=tissue)
+        hdf5 = get_hdf5_data(project_name, eval_id, 0, 0, -1, -1, tissue=tissue, custom_path=custom_embeddings_path)
 
     if nuc:
         coords = _nuclei_coords(eval_id)

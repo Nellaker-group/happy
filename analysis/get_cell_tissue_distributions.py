@@ -22,6 +22,7 @@ def main(
     project_name: str = typer.Option(...),
     organ_name: str = typer.Option("placenta", help="Organ for cell/tissue definitions"),
     db_name: str = typer.Option("main.db", help="Database file in happy/db/, or an absolute path to a .db file"),
+    custom_embeddings_path: Optional[str] = typer.Option(None, help="Custom root path to the project embeddings (overrides default)"),
     save_dir: str = typer.Option(
         "results/cell_tissue_distributions",
         help="Directory (relative to project dir) to write the CSVs to",
@@ -62,7 +63,7 @@ def main(
             assert not include_tissues
         ids = _identifiers(run_id)
         hdf5_data = get_hdf5_data(
-            project_name, run_id, 0, 0, -1, -1, tissue=include_tissues
+            project_name, run_id, 0, 0, -1, -1, tissue=include_tissues, custom_path=custom_embeddings_path
         )
 
         unique_cells, cell_counts = np.unique(
