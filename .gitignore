@@ -218,3 +218,5 @@ labelbox/*.png
 .vscode
 notebooks
 */backup
+# HF weight-upload staging dir (temporary)
+hf_upload/
