@@ -30,7 +30,7 @@ def main(
     tissue: bool = typer.Option(False, help="Plot tissue predictions (organ colours)"),
     overlay: bool = typer.Option(False, help="Plot predictions over the H&E"),
     he_max_size: int = typer.Option(4000, help="Max H&E thumbnail dimension in px"),
-    point_size: float = typer.Option(1.0, help="Scatter point size"),
+    point_size: float = typer.Option(0.5, help="Scatter point size"),
     save_dir: str = typer.Option(
         "visualisations/predictions", help="Dir (relative to project) to save to"
     ),

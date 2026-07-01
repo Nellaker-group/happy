@@ -10,7 +10,11 @@ HAPPY is a three-stage deep learning pipeline for whole slide images (WSIs):
 3. **Tissue classification** — build a cell graph and label each cell's surrounding
    micro-anatomical tissue structure (graph neural network)
 
-The core code is **organ-agnostic**; but trained models + organ definitions are placenta specific.
+The core code is **organ-agnostic**; but trained and written for the placenta.
+
+**Trained model weights** are now on [Hugging Face](https://huggingface.co/emrwlkr/HAPPY)!
+Download with `python -m happy.db.download_models --project-name placenta` — see
+[Using our trained models](#using-our-trained-models).
 
 > **HAPPY v3.0 (June 2026):** debugged(!) tissue graph model, faster nuc inference, improved visualisations, core code is organ agnostic
 > note nuclei inf/ training now uses YOLOv26. (inf still compatible with 
@@ -23,9 +27,30 @@ RetinaNet weights). NB database schema will need updating See [Update to HAPPY v
 
 ---
 
+## Citation
+
+If you use HAPPY, the code base, or the distributed models in your research, please cite the
+original methods paper:
+
+> Vanea, C., Džigurski, J., Rukins, V., Dodi, O., Siigur, S., Salumäe, L., Meir, K., Parks,
+> W.T., Hochner-Celnikier, D., Fraser, A., Hochner, H., Laisk, T., Ernst, L.M., Lindgren, C.M.
+> and Nellåker, C., 2024. Mapping cell-to-tissue graphs across human placenta histology whole
+> slide images using deep learning with HAPPY. *Nature Communications*, 15(1), p.2710.
+
+Much of the **v2/v3** work was developed after that paper.
+If you use these versions or the models distributed with them, please also cite:
+
+> Walker, E.C., Vanea, C., Meir, K., Hochner-Celnikier, D., Hochner, H., Laisk, T., Lindgren,
+> C., Glastonbury, C.A., Ernst, L.M. and Nellaker, C., 2026. Biologically inspired digital
+> histology for deep phenotyping of placental composition changes across major lesion types.
+> *Placenta*.
+
+---
+
 ## Contents
 
 - [Overview](#overview)
+- [Citation](#citation)
 - [Installation](#installation)
 - [Project setup](#project-setup)
 - [Using the trained models? Skip to inference](#using-our-trained-models)
@@ -149,6 +174,34 @@ own ground truth using the [evaluation scripts](#evaluation).
 | Ovary | 0.852 | 0.755 | 0.978 | 0.801 | 0.776 | 0.828 |
 | Placenta | 0.899 | 0.857 | 0.946 | 0.852 | 0.838 | 0.866 |
 
+**Cell classification** (placenta, 11 cell types; held-out test set of 2,743 cells):
+
+| Metric | Value |
+|---|---|
+| Overall accuracy | 84.29% |
+| Top-2 accuracy | 94.90% |
+| Macro-averaged ROC AUC | 0.9773 |
+
+**Tissue classification** (placenta, 9 tissue types; evaluated on 149,425 cell-graph nodes):
+
+| Metric | Value |
+|---|---|
+| Overall accuracy | 68.34% |
+| Top-2 accuracy | 91.14% |
+| Top-3 accuracy | 97.10% |
+| Macro-averaged ROC AUC | 0.8868 |
+
+### Downloading the weights
+
+Trained weights are hosted on the [Hugging Face Hub](https://huggingface.co/emrwlkr/HAPPY).
+The shipped `main.db` already **registers these models by id**, so you just need to download
+the weight files into the project's `trained_models/` dir — no manual registration required:
+
+```bash
+python -m happy.db.download_models --project-name placenta
+```
+
+This fetches all four weight files to `projects/placenta/trained_models/`, matching those register in the db. 
 
 ---
 
