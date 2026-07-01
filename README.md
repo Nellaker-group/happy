@@ -10,7 +10,7 @@ HAPPY is a three-stage deep learning pipeline for whole slide images (WSIs):
 3. **Tissue classification** — build a cell graph and label each cell's surrounding
    micro-anatomical tissue structure (graph neural network)
 
-The core code is **organ-agnostic**; the placenta is provided as a worked example.
+The core code is **organ-agnostic**; but trained models + organ definitions are placenta specific.
 
 > **HAPPY v3.0 (June 2026):** debugged(!) tissue graph model, faster nuc inference, improved visualisations, core code is organ agnostic
 > note nuclei inf/ training now uses YOLOv26. (inf still compatible with 
