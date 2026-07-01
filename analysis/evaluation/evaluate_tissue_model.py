@@ -21,9 +21,10 @@ def main(
     organ_name: str = typer.Option(..., help="Organ name for cell and tissue types"),
     db_name: str = typer.Option("main.db", help="Database file in happy/db/, or an absolute path to a .db file"),
     custom_embeddings_path: Optional[str] = typer.Option(None, help="Custom root path to the project embeddings (overrides default)"),
-    exp_name: str = typer.Option(..., help="Experiment name of the trained model"),
-    model_weights_dir: str = typer.Option(..., help="Timestamp directory containing model weights"),
-    model_name: str = typer.Option(..., help="Filename of the model weights"),
+    tissue_model_id: Optional[int] = typer.Option(None, help="Tissue GraphModel id in the db (alternative to --exp-name/--model-weights-dir/--model-name)"),
+    exp_name: Optional[str] = typer.Option(None, help="Experiment name of the trained model (if not using --tissue-model-id)"),
+    model_weights_dir: Optional[str] = typer.Option(None, help="Timestamp directory containing the model weights"),
+    model_name: str = typer.Option("final_graph_model.pt", help="Filename of the model weights"),
     run_id: int = typer.Option(..., help="Run ID to evaluate over"),
     seed: int = 0,
     x_min: int = 0,
@@ -113,15 +114,25 @@ def main(
         data, tissue_class, remove_unlabelled, True, patch_files, verbose=verbose
     )
 
-    pretrained_path = (
-        project_dir
-        / "results"
-        / "graph"
-        / model_type.value
-        / exp_name
-        / model_weights_dir
-        / model_name
-    )
+    # resolve model weights: prefer a db model id, else the exp/dir/name path
+    if tissue_model_id is not None:
+        pretrained_path = db.get_tissue_model_path(tissue_model_id)
+        eval_name = exp_name or f"tissue_model_{tissue_model_id}"
+    else:
+        if not (exp_name and model_weights_dir):
+            raise typer.BadParameter(
+                "Provide --tissue-model-id, or --exp-name and --model-weights-dir"
+            )
+        pretrained_path = (
+            project_dir
+            / "results"
+            / "graph"
+            / model_type.value
+            / exp_name
+            / model_weights_dir
+            / model_name
+        )
+        eval_name = exp_name
     eval_params = EvalParams(data, device, pretrained_path, model_type, 512, organ)
     eval_runner = EvalRunner.new(eval_params)
 
@@ -130,7 +141,7 @@ def main(
     out, graph_embeddings, predicted_labels = eval_runner.inference()
     print(f"Total inference time: {time.time() - timer_start:.4f} s")
 
-    save_path = project_dir / "results" / "tissue_model_eval" / exp_name / f"run_{run_id}"
+    save_path = project_dir / "results" / "tissue_model_eval" / eval_name / f"run_{run_id}"
     save_path.mkdir(parents=True, exist_ok=True)
     conf_str = "_top_conf" if top_conf else ""
     plot_name = (

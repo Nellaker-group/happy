@@ -1,6 +1,6 @@
 from pathlib import Path
 from collections import namedtuple
-from typing import List
+from typing import List, Optional
 import os
 
 import typer
@@ -29,6 +29,7 @@ from happy.train.utils import (
     plot_cell_pr_curves,
 )
 from happy.organs import get_organ
+import happy.db.eval_runs_interface as db
 from happy.train.cell_train import setup_model
 from happy.data.setup_data import setup_cell_datasets
 from happy.data.setup_dataloader import setup_dataloaders
@@ -38,7 +39,9 @@ def main(
     project_name: str = typer.Option(...),
     organ_name: str = typer.Option(...),
     annot_dir: str = typer.Option(...),
-    pre_trained: str = typer.Option(...),
+    cell_model_id: Optional[int] = typer.Option(None, help="Cell model id in the db (alternative to --pre-trained)"),
+    pre_trained: Optional[str] = typer.Option(None, help="Path to model weights (if not using --cell-model-id)"),
+    db_name: str = typer.Option("main.db", help="Database file in happy/db/, or an absolute path to a .db file"),
     dataset_names: List[str] = typer.Option([]),
     print_mean_confidence: bool = False,
     plot_pr: bool = True,
@@ -63,6 +66,14 @@ def main(
     """
     device = get_device()
 
+    # resolve weights: a db model id, or an explicit path
+    cell_architecture = "resnet-50"
+    if cell_model_id is not None:
+        db.init(db_name)
+        cell_architecture, pre_trained = db.get_model_weights_by_id(cell_model_id)
+    if pre_trained is None:
+        raise typer.BadParameter("Provide --cell-model-id or --pre-trained")
+
     project_dir = (
         Path(__file__).absolute().parent.parent.parent / "projects" / project_name
     )
@@ -78,7 +89,7 @@ def main(
     cell_mapping = {cell.id: cell.label for cell in organ.cells}
 
     model, image_size = setup_model(
-        "resnet-50", False, len(organ.cells), pre_trained, False, device
+        cell_architecture, False, len(organ.cells), pre_trained, False, device
     )
     model.eval()
 

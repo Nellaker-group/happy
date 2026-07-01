@@ -27,9 +27,11 @@ class Metric(str, Enum):
 
 
 def main(
-    model_type: ModelType = typer.Option(..., "--model-type", help="Detector: yolo or retinanet"),
+    model_type: Optional[ModelType] = typer.Option(None, "--model-type", help="Detector: yolo or retinanet (inferred from the db if --nuc-model-id is given)"),
     metric: Metric = typer.Option(Metric.point, "--metric", help="Scoring: map (box mAP50, YOLO only) or point (30px F1)"),
-    weights: List[str] = typer.Option(..., help="Path(s) to model weights. Pass multiple for several seeds/sizes."),
+    weights: List[str] = typer.Option([], help="Path(s) to model weights. Pass multiple for several seeds/sizes."),
+    nuc_model_id: Optional[int] = typer.Option(None, help="Nuclei model id in the db (alternative to --weights; infers --model-type)"),
+    db_name: str = typer.Option("main.db", help="Database file in happy/db/, or an absolute path to a .db file"),
     data: List[str] = typer.Option(..., help="Path(s) to dataset YAML. Pass multiple to evaluate across organs."),
     project_name: Optional[str] = typer.Option(None, help="Project name; if --output-dir not given, results save under projects/<project>/results/nuc_model_eval/<model_label>"),
     output_dir: Optional[str] = typer.Option(None, help="Directory to write results (overrides the project-based default)."),
@@ -70,6 +72,19 @@ def main(
     --weights .../best.pt --data .../placenta_nuclei.yaml --output-dir <run_dir> \
     --model-labels yolo26s_s0 --organ-labels placenta --split test
     """
+    # resolve weights from a db model id (also infers the detector type), or use --weights
+    if nuc_model_id is not None:
+        import happy.db.eval_runs_interface as db
+        db.init(db_name)
+        arch, path = db.get_model_weights_by_id(nuc_model_id)
+        weights = [path]
+        if model_type is None:
+            model_type = ModelType.retinanet if "retina" in arch.lower() else ModelType.yolo
+    if model_type is None:
+        raise typer.BadParameter("Provide --model-type (or --nuc-model-id to infer it)")
+    if not weights:
+        raise typer.BadParameter("Provide --weights or --nuc-model-id")
+
     if model_type is ModelType.retinanet and metric is Metric.map:
         typer.echo("ERROR: --model-type retinanet --metric map is unsupported (RetinaNet has no "
                    "box-mAP in this pipeline). Use --metric point for the YOLO-comparable F1.")
