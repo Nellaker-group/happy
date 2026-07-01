@@ -22,50 +22,43 @@ from happy.train.utils import (
 )
 
 
-def evaluate(tissue_class, predicted_labels, out, organ, compress_labels=False):
+def evaluate(tissue_class, predicted_labels, out, organ):
     tissue_ids = [tissue.id for tissue in organ.tissues]
     # remove unlabelled tissues
     tissue_ids = tissue_ids[1:]
-
-    if compress_labels:
-        tissue_class, predicted_labels, out = _compress_tissue_labels(
-            organ, tissue_class, predicted_labels, out
-        )
 
     accuracy = accuracy_score(tissue_class, predicted_labels)
     balanced_accuracy = balanced_accuracy_score(tissue_class, predicted_labels)
     f1_macro = f1_score(tissue_class, predicted_labels, average="macro")
     cohen_kappa = cohen_kappa_score(tissue_class, predicted_labels)
     mcc = matthews_corrcoef(tissue_class, predicted_labels)
-    if not compress_labels:
-        top_2_accuracy = top_k_accuracy_score(tissue_class, out, k=2, labels=tissue_ids)
-        top_3_accuracy = top_k_accuracy_score(tissue_class, out, k=3, labels=tissue_ids)
-        roc_auc = roc_auc_score(
+    top_2_accuracy = top_k_accuracy_score(tissue_class, out, k=2, labels=tissue_ids)
+    top_3_accuracy = top_k_accuracy_score(tissue_class, out, k=3, labels=tissue_ids)
+    roc_auc = roc_auc_score(
+        tissue_class,
+        softmax(out, axis=-1),
+        average="macro",
+        multi_class="ovo",
+        labels=tissue_ids,
+    )
+    if len(np.unique(tissue_class)) > 1:
+        weighted_roc_auc = roc_auc_score(
             tissue_class,
             softmax(out, axis=-1),
-            average="macro",
+            average="weighted",
             multi_class="ovo",
             labels=tissue_ids,
         )
-        if len(np.unique(tissue_class)) > 1:
-            weighted_roc_auc = roc_auc_score(
-                tissue_class,
-                softmax(out, axis=-1),
-                average="weighted",
-                multi_class="ovo",
-                labels=tissue_ids,
-            )
-        else:
-            print("Only one class present in ground truth, skipping weighted ROC AUC")
-            weighted_roc_auc = 0
+    else:
+        print("Only one class present in ground truth, skipping weighted ROC AUC")
+        weighted_roc_auc = 0
 
     print("-----------------------")
     print(f"Accuracy: {accuracy:.6f}")
-    if not compress_labels:
-        print(f"Top 2 accuracy: {top_2_accuracy:.6f}")
-        print(f"Top 3 accuracy: {top_3_accuracy:.6f}")
-        print(f"ROC AUC macro: {roc_auc:.6f}")
-        print(f"Weighted ROC AUC macro: {weighted_roc_auc:.6f}")
+    print(f"Top 2 accuracy: {top_2_accuracy:.6f}")
+    print(f"Top 3 accuracy: {top_3_accuracy:.6f}")
+    print(f"ROC AUC macro: {roc_auc:.6f}")
+    print(f"Weighted ROC AUC macro: {weighted_roc_auc:.6f}")
     print(f"Balanced accuracy: {balanced_accuracy:.6f}")
     print(f"F1 macro score: {f1_macro:.6f}")
     print(f"Cohen's Kappa score: {cohen_kappa:.6f}")
@@ -159,13 +152,3 @@ def evaluation_plots(tissue_class, predicted_labels, out, organ, run_path):
         out,
         run_path / "pr_curves.png",
     )
-
-
-def _compress_tissue_labels(organ, tissue_class, predicted_labels, out):
-    compression_mapping = {tissue.id: tissue.alt_id for tissue in organ.tissues}
-
-    tissue_class = np.array([compression_mapping[t] for t in tissue_class])
-    predicted_labels = np.array([compression_mapping[t] for t in predicted_labels])
-    # todo: add compression for out
-
-    return tissue_class, predicted_labels, out

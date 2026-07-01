@@ -43,7 +43,6 @@ def main(
     plot_umap: bool = True,
     remove_unlabelled: bool = True,
     tissue_label_tsv: Optional[str] = typer.Option(None, help="TSV file with ground truth tissue labels"),
-    compress_labels: bool = False,
     verbose: bool = True,
 ):
     """Evaluate a trained tissue GNN on a WSI or subregion.
@@ -80,7 +79,6 @@ def main(
         plot_umap: plot UMAP of cell and tissue embeddings (slow for large graphs)
         remove_unlabelled: exclude unlabelled nodes (class 0) from evaluation metrics
         tissue_label_tsv: TSV file with ground truth tissue labels for evaluation metrics
-        compress_labels: compress tissue labels into fewer classes (organ-specific)
         verbose: print graph construction details
     """
     db.init(db_name)
@@ -175,7 +173,7 @@ def main(
 
     if tissue_label_tsv is not None:
         _print_prediction_stats(tissue_class, tissue_label_mapping)
-        evaluate(tissue_class, predicted_labels, out, organ, compress_labels)
+        evaluate(tissue_class, predicted_labels, out, organ)
         evaluation_plots(tissue_class, predicted_labels, out, organ, save_path)
 
     print("Generating image")

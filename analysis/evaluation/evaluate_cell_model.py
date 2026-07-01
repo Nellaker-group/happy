@@ -148,11 +148,6 @@ def main(
         print(f"MCC: {mcc:.6f}")
         print(f"ROC AUC macro: {roc_auc:.6f}")
 
-        alt_ground_truth = _convert_to_alt_label(organ, ground_truth[dataset_name])
-        alt_predictions = _convert_to_alt_label(organ, predictions[dataset_name])
-        alt_label_accuracy = accuracy_score(alt_ground_truth, alt_predictions)
-        print(f"Alt Cell Label Accuracy: {alt_label_accuracy:.3f}")
-
         if print_mean_confidence:
             print("Mean confidence across cells for ground truth cell types:")
             print(list(cell_mapping.values()))
@@ -241,13 +236,6 @@ def main(
                 plt.savefig("../../analysis/evaluation/plots/cell_counts.png")
                 plt.close()
                 plt.clf()
-
-
-def _convert_to_alt_label(organ, labels):
-    ids = [cell.id for cell in organ.cells]
-    alt_ids = [cell.alt_id for cell in organ.cells]
-    alt_id_mapping = dict(zip(ids, alt_ids))
-    return [alt_id_mapping[label] for label in labels]
 
 
 def _plot_confusion_matrix(organ, pred, truth, dataset_name, reorder=None):
