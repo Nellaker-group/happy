@@ -68,7 +68,7 @@ def main(
     )
     os.chdir(str(project_dir))
 
-    plot_dir='../../analysis/evaluation/plots'
+    plot_dir = str(Path(__file__).absolute().parent / "plots")
     if not os.path.exists(plot_dir):
         os.makedirs(plot_dir)
 
@@ -162,13 +162,14 @@ def main(
                 print(f"{cell_label}: {np.round(cell_confidences, 3)}")
 
         if plot_pr:
-            save_path = f"../../analysis/evaluation/plots/{dataset_name}_pr_curves.png"
+            save_path = os.path.join(plot_dir, f"{dataset_name}_pr_curves.png")
             plot_cell_pr_curves(
                 organ,
                 ground_truth[dataset_name],
                 outs[dataset_name],
                 save_path,
             )
+            print(f"Saved PR curves to {save_path}")
 
         if plot_cm:
             cell_mapping = {cell.id: cell.name for cell in organ.cells}
@@ -186,6 +187,7 @@ def main(
                 dataset_name,
                 reorder=sorted_labels,
             )
+            print(f"Saved confusion matrix to {os.path.join(plot_dir, dataset_name + '.png')}")
 
             if plot_pr:
                 recalls = recall_score(
@@ -194,7 +196,7 @@ def main(
                 precisions = precision_score(
                     ground_truth[dataset_name], predictions[dataset_name], average=None
                 )
-                print("Plotting recall and precision bar plots")
+                print(f"Plotting recall and precision bar plots to {plot_dir}/")
                 plt.rcParams["figure.dpi"] = 600
                 r_df = pd.DataFrame(recalls)
                 plt.figure(figsize=(10, 3))
@@ -207,7 +209,7 @@ def main(
                 ax.set(ylabel="Recall", xticklabels=[], ylim=[0.0, 1.0])
                 ax.tick_params(bottom=False)
                 sns.despine(bottom=True)
-                plt.savefig("../../analysis/evaluation/plots/recalls.png")
+                plt.savefig(os.path.join(plot_dir, "recalls.png"))
                 plt.close()
                 plt.clf()
 
@@ -219,11 +221,11 @@ def main(
                 ax.set(xlabel="Precision", yticklabels=[], xlim=[0.0, 1.0])
                 ax.tick_params(left=False)
                 sns.despine(left=True)
-                plt.savefig("../../analysis/evaluation/plots/precisions.png")
+                plt.savefig(os.path.join(plot_dir, "precisions.png"))
                 plt.close()
                 plt.clf()
 
-                print("Plotting cell counts bar plot")
+                print(f"Plotting cell counts bar plot to {os.path.join(plot_dir, 'cell_counts.png')}")
                 _, cell_counts = np.unique(ground_truth[dataset_name], return_counts=True)
                 l_df = pd.DataFrame(cell_counts)
                 plt.rcParams["figure.dpi"] = 600
@@ -233,7 +235,7 @@ def main(
                 ax.set(ylabel="Count", xticklabels=[])
                 ax.tick_params(bottom=False)
                 sns.despine(bottom=True)
-                plt.savefig("../../analysis/evaluation/plots/cell_counts.png")
+                plt.savefig(os.path.join(plot_dir, "cell_counts.png"))
                 plt.close()
                 plt.clf()
 
@@ -247,7 +249,7 @@ def _plot_confusion_matrix(organ, pred, truth, dataset_name, reorder=None):
     plot_confusion_matrix(
         cm,
         dataset_name,
-        Path(f"../../analysis/evaluation/plots/"),
+        Path(__file__).absolute().parent / "plots",
         fmt="d",
         reorder=reorder,
     )
