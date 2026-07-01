@@ -13,6 +13,7 @@ from peewee import (
 from happy.db.base import BaseModel
 from happy.db.slides import Slide
 from happy.db.models_training import Model
+from happy.db.graph_model import GraphModel
 
 
 class EvalRun(BaseModel):
@@ -31,6 +32,11 @@ class EvalRun(BaseModel):
     embeddings_path = TextField(null=True)
     nucs_done = BooleanField(default=False)
     cells_done = BooleanField(default=False)
+    tissue_model = ForeignKeyField(GraphModel, backref="eval_runs", null=True)
+    tissue_done = BooleanField(default=False)
+    k = IntegerField(null=True)
+    graph_method = TextField(null=True)
+    tissue_embeddings_path = TextField(null=True)
 
 
 class Prediction(BaseModel):

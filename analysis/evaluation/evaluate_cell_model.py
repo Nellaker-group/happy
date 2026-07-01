@@ -1,6 +1,6 @@
 from pathlib import Path
 from collections import namedtuple
-from typing import List
+from typing import List, Optional
 import os
 
 import typer
@@ -29,6 +29,7 @@ from happy.train.utils import (
     plot_cell_pr_curves,
 )
 from happy.organs import get_organ
+import happy.db.eval_runs_interface as db
 from happy.train.cell_train import setup_model
 from happy.data.setup_data import setup_cell_datasets
 from happy.data.setup_dataloader import setup_dataloaders
@@ -38,7 +39,9 @@ def main(
     project_name: str = typer.Option(...),
     organ_name: str = typer.Option(...),
     annot_dir: str = typer.Option(...),
-    pre_trained: str = typer.Option(...),
+    cell_model_id: Optional[int] = typer.Option(None, help="Cell model id in the db (alternative to --pre-trained)"),
+    pre_trained: Optional[str] = typer.Option(None, help="Path to model weights (if not using --cell-model-id)"),
+    db_name: str = typer.Option("main.db", help="Database file in happy/db/, or an absolute path to a .db file"),
     dataset_names: List[str] = typer.Option([]),
     print_mean_confidence: bool = False,
     plot_pr: bool = True,
@@ -63,12 +66,20 @@ def main(
     """
     device = get_device()
 
+    # resolve weights: a db model id, or an explicit path
+    cell_architecture = "resnet-50"
+    if cell_model_id is not None:
+        db.init(db_name)
+        cell_architecture, pre_trained = db.get_model_weights_by_id(cell_model_id)
+    if pre_trained is None:
+        raise typer.BadParameter("Provide --cell-model-id or --pre-trained")
+
     project_dir = (
         Path(__file__).absolute().parent.parent.parent / "projects" / project_name
     )
     os.chdir(str(project_dir))
 
-    plot_dir='../../analysis/evaluation/plots'
+    plot_dir = str(project_dir / "results" / "cell_model_eval" / Path(pre_trained).stem)
     if not os.path.exists(plot_dir):
         os.makedirs(plot_dir)
 
@@ -78,7 +89,7 @@ def main(
     cell_mapping = {cell.id: cell.label for cell in organ.cells}
 
     model, image_size = setup_model(
-        "resnet-50", False, len(organ.cells), pre_trained, False, device
+        cell_architecture, False, len(organ.cells), pre_trained, False, device
     )
     model.eval()
 
@@ -148,11 +159,6 @@ def main(
         print(f"MCC: {mcc:.6f}")
         print(f"ROC AUC macro: {roc_auc:.6f}")
 
-        alt_ground_truth = _convert_to_alt_label(organ, ground_truth[dataset_name])
-        alt_predictions = _convert_to_alt_label(organ, predictions[dataset_name])
-        alt_label_accuracy = accuracy_score(alt_ground_truth, alt_predictions)
-        print(f"Alt Cell Label Accuracy: {alt_label_accuracy:.3f}")
-
         if print_mean_confidence:
             print("Mean confidence across cells for ground truth cell types:")
             print(list(cell_mapping.values()))
@@ -167,13 +173,14 @@ def main(
                 print(f"{cell_label}: {np.round(cell_confidences, 3)}")
 
         if plot_pr:
-            save_path = f"../../analysis/evaluation/plots/{dataset_name}_pr_curves.png"
+            save_path = os.path.join(plot_dir, f"{dataset_name}_pr_curves.png")
             plot_cell_pr_curves(
                 organ,
                 ground_truth[dataset_name],
                 outs[dataset_name],
                 save_path,
             )
+            print(f"Saved PR curves to {save_path}")
 
         if plot_cm:
             cell_mapping = {cell.id: cell.name for cell in organ.cells}
@@ -189,8 +196,10 @@ def main(
                 predictions[dataset_name],
                 ground_truth[dataset_name],
                 dataset_name,
+                plot_dir,
                 reorder=sorted_labels,
             )
+            print(f"Saved confusion matrix to {os.path.join(plot_dir, dataset_name + '.png')}")
 
             if plot_pr:
                 recalls = recall_score(
@@ -199,7 +208,7 @@ def main(
                 precisions = precision_score(
                     ground_truth[dataset_name], predictions[dataset_name], average=None
                 )
-                print("Plotting recall and precision bar plots")
+                print(f"Plotting recall and precision bar plots to {plot_dir}/")
                 plt.rcParams["figure.dpi"] = 600
                 r_df = pd.DataFrame(recalls)
                 plt.figure(figsize=(10, 3))
@@ -212,7 +221,7 @@ def main(
                 ax.set(ylabel="Recall", xticklabels=[], ylim=[0.0, 1.0])
                 ax.tick_params(bottom=False)
                 sns.despine(bottom=True)
-                plt.savefig("../../analysis/evaluation/plots/recalls.png")
+                plt.savefig(os.path.join(plot_dir, "recalls.png"))
                 plt.close()
                 plt.clf()
 
@@ -224,11 +233,11 @@ def main(
                 ax.set(xlabel="Precision", yticklabels=[], xlim=[0.0, 1.0])
                 ax.tick_params(left=False)
                 sns.despine(left=True)
-                plt.savefig("../../analysis/evaluation/plots/precisions.png")
+                plt.savefig(os.path.join(plot_dir, "precisions.png"))
                 plt.close()
                 plt.clf()
 
-                print("Plotting cell counts bar plot")
+                print(f"Plotting cell counts bar plot to {os.path.join(plot_dir, 'cell_counts.png')}")
                 _, cell_counts = np.unique(ground_truth[dataset_name], return_counts=True)
                 l_df = pd.DataFrame(cell_counts)
                 plt.rcParams["figure.dpi"] = 600
@@ -238,19 +247,12 @@ def main(
                 ax.set(ylabel="Count", xticklabels=[])
                 ax.tick_params(bottom=False)
                 sns.despine(bottom=True)
-                plt.savefig("../../analysis/evaluation/plots/cell_counts.png")
+                plt.savefig(os.path.join(plot_dir, "cell_counts.png"))
                 plt.close()
                 plt.clf()
 
 
-def _convert_to_alt_label(organ, labels):
-    ids = [cell.id for cell in organ.cells]
-    alt_ids = [cell.alt_id for cell in organ.cells]
-    alt_id_mapping = dict(zip(ids, alt_ids))
-    return [alt_id_mapping[label] for label in labels]
-
-
-def _plot_confusion_matrix(organ, pred, truth, dataset_name, reorder=None):
+def _plot_confusion_matrix(organ, pred, truth, dataset_name, plot_dir, reorder=None):
     cm = get_cell_confusion_matrix(organ, pred, truth, proportion_label=False)
     plt.clf()
     plt.rcParams["figure.dpi"] = 600
@@ -259,7 +261,7 @@ def _plot_confusion_matrix(organ, pred, truth, dataset_name, reorder=None):
     plot_confusion_matrix(
         cm,
         dataset_name,
-        Path(f"../../analysis/evaluation/plots/"),
+        Path(plot_dir),
         fmt="d",
         reorder=reorder,
     )

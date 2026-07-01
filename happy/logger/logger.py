@@ -1,12 +1,12 @@
 import collections
 
-from happy.logger.appenders import Console, File, Visdom
+from happy.logger.appenders import Console, File
 
 
 class Logger:
-    def __init__(self, dataset_names, metrics, vis=True, file=True):
+    def __init__(self, dataset_names, metrics, file=True):
         self.loss_hist = collections.deque(maxlen=500)
-        self.appenders = self._get_appenders(vis, file, dataset_names, metrics)
+        self.appenders = self._get_appenders(file, dataset_names, metrics)
 
     def log_ap(self, split_name, epoch_num, ap):
         for a in self.appenders:
@@ -48,10 +48,8 @@ class Logger:
         file_appender = self.appenders["file"]
         file_appender.train_stats.to_csv(save_path)
 
-    def _get_appenders(self, vis, file, dataset_names, metrics):
+    def _get_appenders(self, file, dataset_names, metrics):
         appenders = {"console": Console()}
-        if vis:
-            appenders["visdom"] = Visdom()
         if file:
             appenders["file"] = File(dataset_names, metrics)
         return appenders

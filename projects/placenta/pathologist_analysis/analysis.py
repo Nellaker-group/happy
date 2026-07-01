@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 from happy.utils.utils import get_project_dir
-from projects.placenta.results.labelbox.path_mapping import PATHOLOGIST_MAPPING
+from projects.placenta.pathologist_analysis.path_mapping import PATHOLOGIST_MAPPING
 
 
 ALL_LABELBOX_LABELS = [

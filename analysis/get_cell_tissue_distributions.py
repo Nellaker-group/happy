@@ -1,4 +1,5 @@
 from typing import List, Optional
+from pathlib import Path
 
 import typer
 import numpy as np
@@ -9,24 +10,43 @@ from happy.utils.utils import get_project_dir
 import happy.db.eval_runs_interface as db
 from happy.graph.graph_creation.get_and_process import get_hdf5_data
 
+# every output CSV starts with these identifier columns
+ID_COLS = ["slide_name", "slide_id", "eval_id"]
+
 
 def main(
-    run_ids: Optional[List[int]] = typer.Option([]),
-    file_run_ids: Optional[str] = None,
+    run_ids: Optional[List[int]] = typer.Option([], help="Eval run IDs to include"),
+    file_run_ids: Optional[str] = typer.Option(
+        None, help="CSV (relative to project dir) of eval run IDs, one per line"
+    ),
     project_name: str = typer.Option(...),
+    organ_name: str = typer.Option("placenta", help="Organ for cell/tissue definitions"),
+    db_name: str = typer.Option("main.db", help="Database file in happy/db/, or an absolute path to a .db file"),
+    custom_embeddings_path: Optional[str] = typer.Option(None, help="Custom root path to the project embeddings (overrides default)"),
+    save_dir: str = typer.Option(
+        "results/cell_tissue_distributions",
+        help="Directory (relative to project dir) to write the CSVs to",
+    ),
     group_knts: bool = True,
-    include_counts: bool = False,
+    include_counts: bool = typer.Option(True, help="Also compute density (counts per mm^2)"),
     include_tissues: bool = True,
 ):
-    """Saves the distribution of cell and tissue types across multiple WSIs as csvs
-    Note: if you do not want to group knts then you cannot use the tissue hdf5 file.
-    """
+    """Save the distribution of cell and tissue types across WSIs as CSVs.
 
-    # Create database connection
-    db.init()
-    organ = get_organ("placenta")
+    Writes up to four CSVs, each row a single eval run and each prefixed with the
+    slide_name, slide_id and eval_id identifier columns:
+        cell_proportions.csv, tissue_proportions.csv  (fraction of cells/nodes)
+        cell_counts.csv,       tissue_counts.csv       (density, counts per mm^2)
+
+    Organ-agnostic: column order follows the organ's cell/tissue definitions.
+    Note: [for placenta]  if you do not group syn knts you cannot use the tissue hdf5 file.
+    """
+    db.init(db_name)
+    organ = get_organ(organ_name)
     cell_label_mapping = {cell.id: cell.name for cell in organ.cells}
     tissue_label_mapping = {tissue.id: tissue.name for tissue in organ.tissues}
+    cell_order = [c.name for c in sorted(organ.cells, key=lambda c: c.structural_id)]
+    tissue_order = [t.name for t in organ.tissues]
     project_dir = get_project_dir(project_name)
 
     if file_run_ids is not None:
@@ -36,132 +56,98 @@ def main(
             .tolist()
         )
 
-    cell_prop_dfs = []
-    cell_counts_df = []
-    tissue_prop_dfs = []
-    tissue_counts_df = []
+    cell_prop_rows, cell_count_rows = [], []
+    tissue_prop_rows, tissue_count_rows = [], []
     for run_id in run_ids:
-        # Get path to embeddings hdf5 files
         if not group_knts:
             assert not include_tissues
+        ids = _identifiers(run_id)
         hdf5_data = get_hdf5_data(
-            project_name, run_id, 0, 0, -1, -1, tissue=include_tissues
+            project_name, run_id, 0, 0, -1, -1, tissue=include_tissues, custom_path=custom_embeddings_path
         )
 
-        # print cell predictions from hdf5 file
         unique_cells, cell_counts = np.unique(
             hdf5_data.cell_predictions, return_counts=True
         )
-        unique_cell_labels = []
-        for label in unique_cells:
-            unique_cell_labels.append(cell_label_mapping[label])
-        cell_proportions = [
-            round((count / sum(cell_counts)), 3) for count in cell_counts
-        ]
-        unique_cell_proportions = dict(zip(unique_cell_labels, cell_proportions))
-        cell_prop_dfs.append(pd.DataFrame([unique_cell_proportions]))
+        cell_labels = [cell_label_mapping[label] for label in unique_cells]
+        cell_proportions = [round(c / sum(cell_counts), 3) for c in cell_counts]
+        cell_prop_rows.append({**ids, **dict(zip(cell_labels, cell_proportions))})
 
+        tile_area = None
         if include_counts:
-            # calculate the area using the tiles containing nuclei to get cells per area
-            tile_coords = np.array(db.get_run_state(run_id))
-            tile_width = tile_coords[tile_coords[:, 1].argmax() + 1][0]
-            tile_height = tile_coords[1][1]
-            xs = hdf5_data.coords[:, 0]
-            ys = hdf5_data.coords[:, 1]
-
-            # count how many tiles have at least one cell
-            tile_count = 0
-            for tile in tile_coords:
-                tile_x = tile[0]
-                tile_y = tile[1]
-
-                mask = np.logical_and(
-                    (np.logical_and(xs >= tile_x, (ys >= tile_y))),
-                    (
-                        np.logical_and(
-                            xs <= (tile_x + tile_width), (ys <= (tile_y + tile_height))
-                        )
-                    ),
-                )
-                if np.any(mask):
-                    tile_count += 1
-            print(f"Number of tiles with a least one cell: {tile_count}")
-            tile_area = tile_count * tile_width * tile_height
-            slide_pixel_size = db.get_slide_pixel_size_by_evalrun(run_id)
-            tile_area = tile_area * slide_pixel_size * slide_pixel_size
-            print(f"Tile area in um^2: {tile_area}")
-
-            cell_counts = [count / tile_area * 1000000 for count in cell_counts]
-            all_cell_counts = dict(zip(unique_cell_labels, cell_counts))
-            cell_counts_df.append(pd.DataFrame([all_cell_counts]))
+            tile_area = _tile_area_um2(run_id, hdf5_data)
+            cell_density = [c / tile_area * 1e6 for c in cell_counts]
+            cell_count_rows.append({**ids, **dict(zip(cell_labels, cell_density))})
 
         if include_tissues:
             unique_tissues, tissue_counts = np.unique(
                 hdf5_data.tissue_predictions, return_counts=True
             )
-            unique_tissue_labels = []
-            for label in unique_tissues:
-                unique_tissue_labels.append(tissue_label_mapping[label])
-            tissue_proportions = [
-                round((count / sum(tissue_counts)), 3) for count in tissue_counts
-            ]
-            unique_tissue_proportions = dict(
-                zip(unique_tissue_labels, tissue_proportions)
+            tissue_labels = [tissue_label_mapping[label] for label in unique_tissues]
+            tissue_proportions = [round(c / sum(tissue_counts), 3) for c in tissue_counts]
+            tissue_prop_rows.append(
+                {**ids, **dict(zip(tissue_labels, tissue_proportions))}
             )
-            tissue_prop_dfs.append(pd.DataFrame([unique_tissue_proportions]))
 
             if include_counts:
-                tissue_counts = [count / tile_area * 1000000 for count in tissue_counts]
-                all_tissue_counts = dict(zip(unique_tissue_labels, tissue_counts))
-                tissue_counts_df.append(pd.DataFrame([all_tissue_counts]))
+                tissue_density = [c / tile_area * 1e6 for c in tissue_counts]
+                tissue_count_rows.append(
+                    {**ids, **dict(zip(tissue_labels, tissue_density))}
+                )
 
-    cell_df = _reorder_cell_columns(pd.concat(cell_prop_dfs), organ)
-    cell_colours = {cell.name: cell.colour for cell in organ.cells}
-    cell_colours["Total"] = "#000000"
-    cell_df.to_csv("plots/cell_proportions.csv")
+    out_dir = project_dir / save_dir
+    out_dir.mkdir(parents=True, exist_ok=True)
 
-    if include_tissues:
-        tissue_df = _reorder_tissue_columns(pd.concat(tissue_prop_dfs))
-        tissue_colours = {tissue.name: tissue.colour for tissue in organ.tissues}
-        tissue_df.to_csv("plots/tissue_proportions.csv")
-
+    _save(cell_prop_rows, cell_order, out_dir / "cell_proportions.csv")
     if include_counts:
-        cell_counts_df = _reorder_cell_columns(pd.concat(cell_counts_df), organ)
-        cell_counts_df["Total"] = cell_counts_df[list(cell_counts_df.columns)].sum(
-            axis=1
-        )
-        cell_counts_df.to_csv("plots/cell_counts.csv")
-
-        if include_tissues:
-            tissue_counts_df = _reorder_tissue_columns(
-                pd.concat(tissue_counts_df)
+        _save(cell_count_rows, cell_order, out_dir / "cell_counts.csv", total=True)
+    if include_tissues:
+        _save(tissue_prop_rows, tissue_order, out_dir / "tissue_proportions.csv")
+        if include_counts:
+            _save(
+                tissue_count_rows, tissue_order, out_dir / "tissue_counts.csv", total=True
             )
-            tissue_counts_df["Total"] = tissue_counts_df[
-                list(tissue_counts_df.columns)
-            ].sum(axis=1)
-            tissue_colours["Total"] = "#000000"
-            tissue_counts_df.to_csv("plots/tissue_counts.csv")
 
 
-def _reorder_cell_columns(cell_df, organ):
-    args_to_sort = np.argsort([cell.structural_id for cell in organ.cells])
-    return cell_df[cell_df.columns[args_to_sort]]
+def _identifiers(run_id):
+    """slide_name, slide_id, eval_id for an eval run, as the leading CSV columns."""
+    eval_run = db.get_eval_run_by_id(run_id)
+    slide = eval_run.slide
+    return {"slide_name": slide.slide_name, "slide_id": slide.id, "eval_id": run_id}
 
 
-def _reorder_tissue_columns(tissue_df):
-    return tissue_df[
-        [
-            "Terminal Villi",
-            "Mature Intermediate Villi",
-            "Stem Villi",
-            "Villus Sprout",
-            "Anchoring Villi",
-            "Chorionic Plate",
-            "Basal Plate/Septum",
-            "Fibrin",
-            "Avascular Villi",
-        ]
-    ]
+def _tile_area_um2(run_id, hdf5_data):
+    """Area (um^2) of tiles containing at least one cell, used for density."""
+    tile_coords = np.array(db.get_run_state(run_id))
+    tile_width = tile_coords[tile_coords[:, 1].argmax() + 1][0]
+    tile_height = tile_coords[1][1]
+    xs, ys = hdf5_data.coords[:, 0], hdf5_data.coords[:, 1]
+
+    tile_count = 0
+    for tile_x, tile_y in tile_coords:
+        mask = (
+            (xs >= tile_x)
+            & (ys >= tile_y)
+            & (xs <= tile_x + tile_width)
+            & (ys <= tile_y + tile_height)
+        )
+        if np.any(mask):
+            tile_count += 1
+    print(f"run {run_id}: {tile_count} tiles with at least one cell")
+
+    slide_pixel_size = db.get_slide_pixel_size_by_evalrun(run_id)
+    return tile_count * tile_width * tile_height * slide_pixel_size * slide_pixel_size
+
+
+def _save(rows, structure_order, csv_path, total=False):
+    """Write rows to CSV: identifier columns first, then structures in organ order."""
+    df = pd.DataFrame(rows).fillna(0)
+    present = [s for s in structure_order if s in df.columns]
+    df = df[ID_COLS + present]
+    if total:
+        df["Total"] = df[present].sum(axis=1)
+    df.to_csv(csv_path, index=False)
+    print(f"Saved {csv_path}")
 
 
 if __name__ == "__main__":

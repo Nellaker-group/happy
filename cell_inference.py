@@ -18,13 +18,13 @@ def main(
     cell_model_id: Optional[int] = None,
     run_id: Optional[int] = None,
     slide_id: Optional[int] = None,
-    nuc_num_workers: int = 20,
+    nuc_num_workers: int = 7,
     cell_num_workers: int = 16,
-    score_threshold: float = 0.4,
-    max_detections: int = 500,
-    nuc_batch_size: int = 16,
+    score_threshold: float = 0.2,
+    max_detections: int = 600,
+    nuc_batch_size: int = 32,
     cell_batch_size: int = 800,
-    tile_size: int = 15000,
+    big_tile_size: int = 10000,
     run_nuclei_pipeline: bool = True,
     run_cell_pipeline: bool = True,
     re_run_all_cell:bool = False,
@@ -53,11 +53,11 @@ def main(
         score_threshold: nuclei network confidence cutoff for saving predictions
         max_detections: max nuclei detections for saving predictions
         nuc_batch_size: batch size for nuclei inference
-        tile_size: size of the tile pushed to gpu for both nuclei and cell inference (Square tile, W = H)
+        big_tile_size: size of the big tile for both nuclei and cell inference (Square tile, W = H)
         cell_batch_size: batch size for cell inference
         run_nuclei_pipeline: True if you want to perform nuclei detection
         run_cell_pipeline: True if you want to perform cell classification
-        re_run_all_cell: True if you want to run all the cells instead of just remaining cells. With run_id and run_nuclei_pipeline = False to re run cell pipeline for all cells
+        re_run_all_cell: True if you want to run all the cells instead of just remaining cells. For testing purpose, with run_id and run_nuclei_pipeline = False to re run cell pipeline for all cells
         get_cuda_device_num: if you want the code to choose a gpu
         verbose: if you want to print the progress bar or not
     """
@@ -74,7 +74,7 @@ def main(
             nuc_model_id,
             slide_id,
             run_id,
-            tile_size,
+            big_tile_size,
             nuc_num_workers,
             nuc_batch_size,
             score_threshold,
@@ -96,7 +96,7 @@ def main(
             run_id,
             cell_batch_size,
             cell_num_workers,
-            tile_size,
+            big_tile_size,
             device,
             re_run_all_cell,
             verbose,
@@ -109,7 +109,7 @@ def nuclei_eval_pipeline(
     model_id,
     slide_id,
     run_id,
-    tile_size,
+    big_tile_size,
     num_workers,
     batch_size,
     score_threshold,
@@ -118,14 +118,17 @@ def nuclei_eval_pipeline(
     verbose,
 ):
     # Load model weights and push to device
-    model = nuclei_infer.setup_model(model_id, device)
+    model, model_architecture = nuclei_infer.setup_model(model_id, device)
     # Load datasets and dataloader
     dataloader, pred_saver = nuclei_infer.setup_data(
-        slide_id, run_id, model_id, tile_size, batch_size, overlap=200, num_workers=num_workers
+        slide_id, run_id, model_id, big_tile_size, batch_size, overlap=200,
+        num_workers=num_workers, model_architecture=model_architecture
     )
+    n_tiles = db.get_num_remaining_tiles(pred_saver.id)
+    print(f"{n_tiles} tiles remaining to process")
     # Predict nuclei
     nuclei_infer.run_nuclei_eval(
-        dataloader, model, pred_saver, device, score_threshold, max_detections, verbose
+        dataloader, model, model_architecture, pred_saver, device, score_threshold, max_detections, verbose
     )
     nuclei_infer.clean_up(pred_saver)
     return pred_saver.id
@@ -138,7 +141,7 @@ def cell_eval_pipeline(
     run_id,
     batch_size,
     num_workers,
-    tile_size,
+    big_tile_size,
     device,
     re_run_all_cell,
     verbose,
@@ -153,7 +156,7 @@ def cell_eval_pipeline(
         run_id,
         model_id,
         model_architecture,
-        tile_size,
+        big_tile_size,
         re_run_all_cell,
         batch_size=batch_size,
         num_workers=num_workers,

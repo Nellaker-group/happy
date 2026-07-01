@@ -8,6 +8,8 @@ from happy.utils.utils import get_device, get_project_dir
 from happy.logger.logger import Logger
 from happy.organs import get_organ
 from happy.train import cell_train, utils
+from happy.db.models_training import Model, TrainRun
+import happy.db.eval_runs_interface as db
 
 
 def main(
@@ -18,8 +20,8 @@ def main(
     dataset_names: List[str] = typer.Option([]),
     model_name: str = "resnet-50",
     pre_trained: Optional[str] = None,
-    num_workers: int = 16,
-    epochs: int = 20,
+    num_workers: int = 7,
+    epochs: int = 100,
     batch: int = 600,
     val_batch: int = 600,
     learning_rate: float = 1e-4,
@@ -28,16 +30,14 @@ def main(
     init_from_inc: bool = False,
     frozen: bool = True,
     weighted_loss: bool = False,
-    vis: bool = True,
     get_cuda_device_num: bool = False,
+    db_name: str = typer.Option("main.db", help="Database file in happy/db/, or an absolute path to a .db file"),
+    add_to_db: bool = typer.Option(False, help="Register the trained cell model in the database"),
 ):
     """For training a cell classification model
 
     Multiple datasets can be combined by passing in 'dataset_names' multiple times with
     the correct datasets directory name.
-
-    Visualising the batch and epoch metrics during training requires having a visdom
-    server running on port 8998 (and vis=True).
 
     Args:
         project_name: name of the project dir to save results to
@@ -57,7 +57,6 @@ def main(
         init_from_inc: whether to use imagenet/coco pretrained weights
         frozen: whether to freeze most of the layers. True for only fine-tuning
         weighted_loss: whether to use weighted loss for imbalanced datasets
-        vis: whether to use visdom for visualisation
         get_cuda_device_num: True if you want the code to choose a gpu
     """
     device = get_device(get_cuda_device_num)
@@ -96,7 +95,7 @@ def main(
     )
 
     # Setup recording of stats for each datasets per batch and epoch
-    logger = Logger(list(dataloaders.keys()), ["loss", "accuracy"], vis)
+    logger = Logger(list(dataloaders.keys()), ["loss", "accuracy"])
 
     # Setup training parameters
     optimizer, criterion, scheduler = cell_train.setup_training_params(
@@ -114,6 +113,7 @@ def main(
     hp.to_csv(run_path)
 
     # train!
+    best_accuracy = 0
     try:
         print(f"Num training images: {len(dataloaders['train'].dataset)}")
         print(
@@ -121,7 +121,7 @@ def main(
             f"with lr of {hp.learning_rate}, batch size {hp.batch}, "
             f"init from coco is {hp.init_from_inc}"
         )
-        cell_train.train(
+        best_accuracy = cell_train.train(
             organ,
             hp.epochs,
             model,
@@ -141,6 +141,30 @@ def main(
 
     # Save hyperparameters, the logged train stats, and the final model
     cell_train.save_state(logger, model, hp, run_path)
+
+    # optionally register the best cell model in the database
+    if add_to_db:
+        db.init(db_name)
+        best_model_path = run_path / f"cell_model_accuracy_{round(best_accuracy, 4)}.pt"
+        if not best_model_path.exists():
+            best_model_path = run_path / "cell_final_model.pt"
+        train_run = TrainRun.create(
+            run_name=exp_name,
+            type="Cell",
+            pre_trained_path=pre_trained or "",
+            num_epochs=epochs,
+            batch_size=batch,
+            init_lr=learning_rate,
+            lr_step=step_size,
+        )
+        model_record = Model.create(
+            train_run=train_run,
+            type="Cell",
+            path=str(best_model_path.resolve()),
+            architecture=model_name,
+            performance=round(best_accuracy, 4),
+        )
+        print(f"Model registered in DB with ID: {model_record.id}")
 
 
 if __name__ == "__main__":

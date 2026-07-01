@@ -4,11 +4,9 @@ import numpy as np
 import pandas as pd
 
 from happy.hdf5 import get_embeddings_file, HDF5Dataset
-from projects.placenta.graphs.processing.process_knots import process_knts
-
 
 def get_and_process_raw_data(
-    project_name, organ, project_dir, run_id, graph_params, tissue_label_tsv
+    project_name, organ, project_dir, run_id, graph_params, tissue_label_tsv, custom_path=None
 ):
     if "x_min" not in graph_params:
         graph_params["x_min"] = 0
@@ -16,7 +14,8 @@ def get_and_process_raw_data(
         graph_params["width"] = -1
         graph_params["height"] = -1
     hdf5_data, tissue_class = get_raw_data(
-        project_name, organ, project_dir, run_id, graph_params, tissue_label_tsv
+        project_name, organ, project_dir, run_id, graph_params, tissue_label_tsv,
+        custom_path=custom_path,
     )
     hdf5_data, tissue_class = process_raw_data(
         organ,
@@ -37,6 +36,7 @@ def get_raw_data(
     run_id,
     graph_params,
     tissue_label_tsv,
+    custom_path=None,
 ):
     # Get training data from hdf5 files
     hdf5_data = get_hdf5_data(
@@ -46,6 +46,7 @@ def get_raw_data(
         graph_params["y_min"],
         graph_params["width"],
         graph_params["height"],
+        custom_path=custom_path,
     )
     # Get ground truth manually annotated data
     _, _, tissue_class = get_groundtruth_patch(
@@ -70,8 +71,12 @@ def process_raw_data(
     standardise=False,
 ):
     # Covert isolated knts into syn and turn groups into a single knt point
-    if group_knts:
-        hdf5_data, tissue_class = process_knts(organ, hdf5_data, tissue_class)
+    # just runs placenta specific
+    # TODO: make project/{organ} specific preprocessing functions? 
+    if organ == "placenta":
+        if group_knts:
+            from projects.placenta.graphs.processing.process_knots import process_knts
+            hdf5_data, tissue_class = process_knts(organ, hdf5_data, tissue_class)
     if top_conf:
         hdf5_data, tissue_class = confidence_filter(hdf5_data, 0.9, 1.0, tissue_class)
     # Remove a random percentage of the data
@@ -124,14 +129,14 @@ def get_hdf5_data(
 
 def get_groundtruth_patch(organ, project_dir, x_min, y_min, width, height, annot_tsv):
     if not annot_tsv:
-        print("No tissue annotation tsv supplied")
+        print("No tissue annotation csv supplied")
         return None, None, None
     tissue_label_path = project_dir / "results" / "tissue_annots" / annot_tsv
     if not os.path.exists(str(tissue_label_path)):
-        print("No tissue label tsv found")
+        print("No tissue label csv found")
         return None, None, None
 
-    ground_truth_df = pd.read_csv(tissue_label_path, sep="\t")
+    ground_truth_df = pd.read_csv(tissue_label_path, sep=None, engine="python")
     xs = ground_truth_df["px"].to_numpy()
     ys = ground_truth_df["py"].to_numpy()
     tissue_classes = ground_truth_df["class"].to_numpy()
