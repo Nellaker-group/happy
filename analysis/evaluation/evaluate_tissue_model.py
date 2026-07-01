@@ -20,6 +20,8 @@ from happy.graph.graph_creation.node_dataset_splits import setup_node_splits
 def main(
     project_name: str = typer.Option(..., help="Project directory name"),
     organ_name: str = typer.Option(..., help="Organ name for cell and tissue types"),
+    db_name: str = typer.Option("main.db", help="Database file in happy/db/, or an absolute path to a .db file"),
+    custom_embeddings_path: Optional[str] = typer.Option(None, help="Custom root path to the project embeddings (overrides default)"),
     exp_name: str = typer.Option(..., help="Experiment name of the trained model"),
     model_weights_dir: str = typer.Option(..., help="Timestamp directory containing model weights"),
     model_name: str = typer.Option(..., help="Filename of the model weights"),
@@ -81,7 +83,7 @@ def main(
         compress_labels: compress tissue labels into fewer classes (organ-specific)
         verbose: print graph construction details
     """
-    db.init()
+    db.init(db_name)
     set_seed(seed)
     device = get_device()
     project_dir = get_project_dir(project_name)
@@ -104,7 +106,8 @@ def main(
     }
 
     hdf5_data, tissue_class = get_and_process_raw_data(
-        project_name, organ, project_dir, run_id, graph_params, tissue_label_tsv
+        project_name, organ, project_dir, run_id, graph_params, tissue_label_tsv,
+        custom_path=custom_embeddings_path,
     )
 
     data = setup_graph(hdf5_data, organ, feature, k, graph_method, tissue_class)
