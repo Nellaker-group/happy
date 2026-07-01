@@ -106,6 +106,7 @@ def main(
     print(f"Total inference time: {time.time() - timer_start:.4f} s")
 
     save_path = get_model_eval_path(model_name, pretrained_path, run_id)
+    print(f"Saving tissue inference outputs to {save_path}")
 
     print("Generating image")
     colours_dict = {tissue.id: tissue.colour for tissue in organ.tissues}
@@ -118,6 +119,7 @@ def main(
         width=int(data.pos[:, 0].max()) - int(data.pos[:, 0].min()),
         height=int(data.pos[:, 1].max()) - int(data.pos[:, 1].min()),
     )
+    print(f"Saved tissue prediction image to {save_path / 'all_wsi.png'}")
 
     tissue_confidence = softmax(out, axis=-1)
     top_confidence = tissue_confidence[
@@ -150,6 +152,7 @@ def _save_embeddings_as_hdf5(
     hdf5_data.tissue_embeddings = tissue_embeddings
     hdf5_data.tissue_confidence = tissue_confidence
     hdf5_data.to_path(save_path, overwrite=True)
+    print(f"Saved tissue embeddings hdf5 to {save_path}")
 
 
 def _save_tissue_preds_as_tsv(predicted_labels, coords, save_path, organ):
@@ -164,6 +167,7 @@ def _save_tissue_preds_as_tsv(predicted_labels, coords, save_path, organ):
         }
     )
     tissue_preds_df.to_csv(save_path / "tissue_preds.tsv", sep="\t", index=False)
+    print(f"Saved tissue predictions tsv to {save_path / 'tissue_preds.tsv'}")
 
 
 if __name__ == "__main__":
