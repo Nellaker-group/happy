@@ -10,7 +10,6 @@ from happy.utils.utils import get_device, get_project_dir, set_seed
 from happy.graph.graph_creation.get_and_process import get_and_process_raw_data
 from happy.graph.graph_creation.create_graph import setup_graph
 from happy.graph.enums import FeatureArg, MethodArg, SupervisedModelsArg
-from happy.graph.utils.utils import get_model_eval_path
 from happy.graph.utils.visualise_points import visualize_points
 from happy.graph.utils.evaluation import evaluate, evaluation_plots
 from happy.graph.runners.eval_runner import EvalParams, EvalRunner
@@ -131,7 +130,8 @@ def main(
     out, graph_embeddings, predicted_labels = eval_runner.inference()
     print(f"Total inference time: {time.time() - timer_start:.4f} s")
 
-    save_path = get_model_eval_path(model_name, pretrained_path, run_id)
+    save_path = project_dir / "results" / "tissue_model_eval" / exp_name / f"run_{run_id}"
+    save_path.mkdir(parents=True, exist_ok=True)
     conf_str = "_top_conf" if top_conf else ""
     plot_name = (
         f"{val_patch_files[0].split('.csv')[0]}{conf_str}"

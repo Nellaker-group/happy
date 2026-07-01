@@ -31,7 +31,8 @@ def main(
     metric: Metric = typer.Option(Metric.point, "--metric", help="Scoring: map (box mAP50, YOLO only) or point (30px F1)"),
     weights: List[str] = typer.Option(..., help="Path(s) to model weights. Pass multiple for several seeds/sizes."),
     data: List[str] = typer.Option(..., help="Path(s) to dataset YAML. Pass multiple to evaluate across organs."),
-    output_dir: str = typer.Option(..., help="Directory to write the metrics CSV (+ plots for map)."),
+    project_name: Optional[str] = typer.Option(None, help="Project name; if --output-dir not given, results save under projects/<project>/results/nuc_model_eval/<model_label>"),
+    output_dir: Optional[str] = typer.Option(None, help="Directory to write results (overrides the project-based default)."),
     model_labels: Optional[List[str]] = typer.Option(None, help="Display name per weights (defaults to dir name)"),
     organ_labels: Optional[List[str]] = typer.Option(None, help="Display name per dataset (defaults to YAML stem)"),
     split: str = typer.Option("test", help="Dataset split: test or val"),
@@ -75,8 +76,6 @@ def main(
         raise typer.Exit(1)
 
     weight_paths = [Path(w).resolve() for w in weights]
-    out = Path(output_dir)
-    out.mkdir(parents=True, exist_ok=True)
 
     if model_labels and len(model_labels) != len(weight_paths):
         raise typer.BadParameter("--model-labels count must match --weights count.")
@@ -88,6 +87,16 @@ def main(
     default_depth = 1 if model_type is ModelType.yolo else 0
     m_labels = model_labels or [p.parents[default_depth].name for p in weight_paths]
     o_labels = organ_labels or [Path(d).stem for d in data]
+
+    # results go to <project>/results/nuc_model_eval/<model_label> unless --output-dir overrides
+    if output_dir:
+        out = Path(output_dir)
+    elif project_name:
+        from happy.utils.utils import get_project_dir
+        out = get_project_dir(project_name) / "results" / "nuc_model_eval" / m_labels[0]
+    else:
+        raise typer.BadParameter("Provide --output-dir or --project-name")
+    out.mkdir(parents=True, exist_ok=True)
 
     if metric is Metric.map:
         _run_yolo_box(weight_paths, m_labels, data, o_labels, split, imgsz, conf, iou,

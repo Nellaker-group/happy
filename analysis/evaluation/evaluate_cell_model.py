@@ -68,7 +68,7 @@ def main(
     )
     os.chdir(str(project_dir))
 
-    plot_dir = str(Path(__file__).absolute().parent / "plots")
+    plot_dir = str(project_dir / "results" / "cell_model_eval" / Path(pre_trained).stem)
     if not os.path.exists(plot_dir):
         os.makedirs(plot_dir)
 
@@ -185,6 +185,7 @@ def main(
                 predictions[dataset_name],
                 ground_truth[dataset_name],
                 dataset_name,
+                plot_dir,
                 reorder=sorted_labels,
             )
             print(f"Saved confusion matrix to {os.path.join(plot_dir, dataset_name + '.png')}")
@@ -240,7 +241,7 @@ def main(
                 plt.clf()
 
 
-def _plot_confusion_matrix(organ, pred, truth, dataset_name, reorder=None):
+def _plot_confusion_matrix(organ, pred, truth, dataset_name, plot_dir, reorder=None):
     cm = get_cell_confusion_matrix(organ, pred, truth, proportion_label=False)
     plt.clf()
     plt.rcParams["figure.dpi"] = 600
@@ -249,7 +250,7 @@ def _plot_confusion_matrix(organ, pred, truth, dataset_name, reorder=None):
     plot_confusion_matrix(
         cm,
         dataset_name,
-        Path(__file__).absolute().parent / "plots",
+        Path(plot_dir),
         fmt="d",
         reorder=reorder,
     )
