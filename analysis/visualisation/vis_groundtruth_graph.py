@@ -1,10 +1,10 @@
 import typer
 import numpy as np
 
-from happy.graph.create_graph import get_groundtruth_patch
+from happy.graph.graph_creation.get_and_process import get_groundtruth_patch
 from happy.utils.utils import get_project_dir
 from happy.organs import get_organ
-from happy.graph.visualise import visualize_points
+from happy.graph.utils.visualise_points import visualize_points
 
 
 def main(
