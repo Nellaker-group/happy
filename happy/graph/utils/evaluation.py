@@ -89,7 +89,7 @@ def evaluation_plots(tissue_class, predicted_labels, out, organ, run_path):
 
     recalls = recall_score(tissue_class, predicted_labels, average=None)
     precisions = precision_score(tissue_class, predicted_labels, average=None)
-    print("Plotting recall and precision bar plots")
+    print(f"Plotting recall and precision bar plots to {run_path}/recalls.png and {run_path}/precisions.png")
     plt.rcParams["figure.dpi"] = 600
     r_df = pd.DataFrame(recalls)
     plt.figure(figsize=(10, 3))
@@ -115,7 +115,7 @@ def evaluation_plots(tissue_class, predicted_labels, out, organ, run_path):
     plt.close()
     plt.clf()
 
-    print("Plotting tissue counts bar plot")
+    print(f"Plotting tissue counts bar plot to {run_path / 'tissue_counts.png'}")
     _, tissue_counts = np.unique(tissue_class, return_counts=True)
     l_df = pd.DataFrame(tissue_counts)
     plt.rcParams["figure.dpi"] = 600
@@ -129,7 +129,7 @@ def evaluation_plots(tissue_class, predicted_labels, out, organ, run_path):
     plt.close()
     plt.clf()
 
-    print("Plotting confusion matrices")
+    print(f"Plotting confusion matrices to {run_path}")
     cm_df, cm_df_props = get_tissue_confusion_matrix(
         organ, predicted_labels, tissue_class, proportion_label=False
     )
@@ -143,7 +143,7 @@ def evaluation_plots(tissue_class, predicted_labels, out, organ, run_path):
         cm_df_props, "All Tissues Proportion", run_path, ".2f", reorder=sorted_labels
     )
 
-    print("Plotting pr curves")
+    print(f"Plotting pr curves to {run_path / 'pr_curves.png'}")
     plot_tissue_pr_curves(
         tissue_mapping,
         tissue_colours,

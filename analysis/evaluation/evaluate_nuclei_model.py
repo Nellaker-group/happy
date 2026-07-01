@@ -303,6 +303,7 @@ def _plot_bar_comparison(df: pd.DataFrame, out: Path):
     plt.tight_layout()
     plt.savefig(out / "bar_comparison_map50.png", bbox_inches="tight")
     plt.close()
+    typer.echo(f"Bar comparison saved to {out / 'bar_comparison_map50.png'}")
 
 
 def _plot_predictions(models, model_labels, image_paths, out, conf, iou, imgsz, max_det):
@@ -332,7 +333,7 @@ def _plot_predictions(models, model_labels, image_paths, out, conf, iou, imgsz, 
         plt.tight_layout()
         plt.savefig(out / f"predictions_{Path(img_path).stem}.png", bbox_inches="tight")
         plt.close()
-        typer.echo(f"Prediction plot saved for {Path(img_path).name}")
+        typer.echo(f"Prediction plot saved to {out / f'predictions_{Path(img_path).stem}.png'}")
 
 if __name__ == "__main__":
     typer.run(main)
