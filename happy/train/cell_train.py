@@ -175,6 +175,8 @@ def train(
             list(dataloaders.keys()),
         )
 
+    return prev_best_accuracy
+
 
 def single_batch(phase, optimizer, criterion, model, data, logger, batch_count, device):
     optimizer.zero_grad()
