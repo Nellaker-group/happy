@@ -193,8 +193,8 @@ labels.
 We provide evaluation scripts for checking model performance on validation or test 
 data for each of the three models under `analysis/evaluation/`. The nuclei detection
 model can be evaluated using `evaluate_nuclei_model.py`, the cell classification model 
-can be evaluated using `evaluate_cell_model.py`, and the graph tissue model can be
-evaluated using `evaluate_graph_model.py`.
+can be evaluated using `evaluate_cell_model.py`, and the tissue model can be
+evaluated using `evaluate_tissue_model.py`.
 
 ## WSI Inference Pipeline
 

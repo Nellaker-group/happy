@@ -38,7 +38,7 @@ def main(
         cell_counts.csv,       tissue_counts.csv       (density, counts per mm^2)
 
     Organ-agnostic: column order follows the organ's cell/tissue definitions.
-    Note: if you do not group knts you cannot use the tissue hdf5 file.
+    Note: [for placenta]  if you do not group syn knts you cannot use the tissue hdf5 file.
     """
     db.init(db_name)
     organ = get_organ(organ_name)
