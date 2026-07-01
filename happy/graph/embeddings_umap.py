@@ -5,8 +5,6 @@ from sklearn.cluster import KMeans, DBSCAN
 import matplotlib.pyplot as plt
 import numpy as np
 
-from analysis.embeddings.plots import plot_umap
-
 
 def generate_umap(
     model_type, model, x, edge_index, organ, predictions, run_path, plot_name
@@ -17,7 +15,13 @@ def generate_umap(
 
 
 def plot_cell_graph_umap(organ, predictions, mapper, save_dir, plot_name):
-    plot = plot_umap(organ, predictions, mapper)
+    colours_dict = {cell.label: cell.colour for cell in organ.cells}
+    labels = np.array([organ.cells[pred].label for pred in predictions])
+
+    # only keep colours for cell types actually present (organ-agnostic)
+    filtered_colour_dict = {k: v for k, v in colours_dict.items() if k in labels}
+
+    plot = umap.plot.points(mapper, labels=labels, color_key=filtered_colour_dict)
     print(f"saving umap to {save_dir / plot_name}")
     plot.figure.savefig(save_dir / plot_name)
     plt.close(plot.figure)
