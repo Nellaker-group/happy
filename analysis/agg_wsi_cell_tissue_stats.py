@@ -21,6 +21,7 @@ def main(
     project_name: str = typer.Option(...),
     organ_name: str = typer.Option("placenta", help="Organ for cell/tissue definitions"),
     db_name: str = typer.Option("main.db", help="Database file in happy/db/, or an absolute path to a .db file"),
+    custom_embeddings_path: Optional[str] = typer.Option(None, help="Custom root path to the project embeddings (overrides default)"),
     tissues: Optional[List[str]] = typer.Option(
         [], help="Restrict to these tissue names (empty = all tissues in the organ)"
     ),
@@ -56,7 +57,7 @@ def main(
 
     per_run_dfs = []
     for run_id in run_ids:
-        hdf5_data = get_hdf5_data(project_name, run_id, 0, 0, -1, -1, tissue=True)
+        hdf5_data = get_hdf5_data(project_name, run_id, 0, 0, -1, -1, tissue=True, custom_path=custom_embeddings_path)
 
         df = pd.DataFrame(
             {
