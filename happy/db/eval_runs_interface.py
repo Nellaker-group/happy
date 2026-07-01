@@ -189,9 +189,10 @@ def commit_pred_workings(run_id):
         .order_by(UnvalidatedPrediction.x, UnvalidatedPrediction.y.asc())
     )
 
-    rows = Prediction.insert_from(
+    Prediction.insert_from(
         source, fields=[Prediction.run, Prediction.x, Prediction.y]
     ).execute()
+    rows = Prediction.select().where(Prediction.run == run_id).count()
     print(f"added {rows} nuclei predictions to Predictions table for eval run {run_id}")
 
 
