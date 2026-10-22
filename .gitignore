@@ -220,3 +220,6 @@ notebooks
 */backup
 # HF weight-upload staging dir (temporary)
 hf_upload/
+
+!projects/cord_membrane/spatial_analysis/plots
+**/slide_sets
