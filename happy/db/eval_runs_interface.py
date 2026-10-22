@@ -25,10 +25,16 @@ def get_slide_by_id(slide_id):
     return Slide.get_by_id(slide_id)
 
 
+# model paths relative to repo root for diff projects
+def _resolve_model_path(path):
+    path = Path(path)
+    return path if path.is_absolute() else Path(__file__).absolute().parent.parent.parent / path
+
+
 # returns the path to model_weights
 def get_model_weights_by_id(model_id):
     model = Model.get_by_id(model_id)
-    return model.architecture, model.path
+    return model.architecture, str(_resolve_model_path(model.path))
 
 
 # returns an eval run
@@ -367,7 +373,7 @@ def set_tissue_graph_params(run_id, k, graph_method):
 
 def get_tissue_model_path(tissue_model_id):
     model = GraphModel.get_by_id(tissue_model_id)
-    return Path(model.path)
+    return _resolve_model_path(model.path)
 
 
 def set_tissue_model(run_id, tissue_model_id):
