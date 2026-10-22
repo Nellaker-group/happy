@@ -27,7 +27,7 @@ def reclass_tissue(
     Smaller vessels take the most common non-vessel tissue around them.
 
     Args:
-        tissue_predictions: (N,) tissue class ids for the placenta_cord organ
+        tissue_predictions: (N,) tissue class ids for the cord organ
         coords: (N, 2) cell coordinates
         section_edges: (2, E) cell graph edges used to find cord sections
         vessel_edges: (2, E) cell graph edges used to find vessels
@@ -35,7 +35,7 @@ def reclass_tissue(
     Returns:
         (N,) array of relabelled tissue class ids
     """
-    organ = get_organ("placenta_cord")
+    organ = get_organ("cord")
     artery = organ.tissue_by_label("UArtery").id
     vein = organ.tissue_by_label("UVein").id
 
@@ -106,7 +106,7 @@ def reclass_tissue(
 
 def reclass_remnants(tissue_predictions, edges):
     """Relabel allantoic and vitelline remnants with the most common other tissue around them."""
-    organ = get_organ("placenta_cord")
+    organ = get_organ("cord")
     remnants = [organ.tissue_by_label(label).id for label in REMNANTS]
     is_remnant = np.isin(tissue_predictions, remnants)
     updated_predictions = relabel_from_neighbours(

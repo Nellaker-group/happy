@@ -72,7 +72,7 @@ PLACENTA = Organ(
         Tissue("Avascular", "Avascular Villi", "#450270", 12),
     ],
 )
-PLACENTA_CORD = Organ(
+CORD = Organ(
     [
         Cell("EPI", "Epithelial Cell", "#332288", 0, 4),
         Cell("VEN", "Vascular Endothelial", "#88CCEE", 1, 2),
@@ -95,7 +95,7 @@ PLACENTA_CORD = Organ(
         Tissue("VitVes", "Vitelline Vessel Remnant", "#e15759", 9),
     ],
 )
-PLACENTA_MEMBRANE = Organ(
+MEMBRANE = Organ(
     [
         Cell("EPI", "Epithelial Cell", "#332288", 0, 2),
         Cell("VEN", "Vascular Endothelial", "#88CCEE", 1, 2),
@@ -123,7 +123,7 @@ PLACENTA_MEMBRANE = Organ(
 def get_organ(organ_name):
     organ_dicts = {
         "placenta": PLACENTA,
-        "placenta_cord": PLACENTA_CORD,
-        "placenta_membrane": PLACENTA_MEMBRANE,
+        "cord": CORD,
+        "membrane": MEMBRANE,
     }
     return organ_dicts[organ_name]

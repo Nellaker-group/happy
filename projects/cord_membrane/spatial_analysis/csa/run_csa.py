@@ -85,7 +85,7 @@ def main(
             Wharton's jelly
     """
     db.init(db_name)
-    organ = get_organ("placenta_cord")
+    organ = get_organ("cord")
     pixel_size = db.get_slide_pixel_size_by_evalrun(run_id)
     save_dir = get_project_dir(project_name) / "results" / "csa"
     save_dir.mkdir(parents=True, exist_ok=True)
@@ -93,7 +93,7 @@ def main(
     coords, cell_predictions, tissue_predictions = load_predictions(
         project_name,
         run_id,
-        "placenta_cord",
+        "cord",
         reclassed,
         x_min,
         y_min,

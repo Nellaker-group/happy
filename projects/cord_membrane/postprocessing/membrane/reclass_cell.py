@@ -26,7 +26,7 @@ def reclass_cell(cell_predictions, cell_embeddings, tissue_predictions, cell_mod
         cell_predictions,
         cell_embeddings,
         tissue_predictions,
-        get_organ("placenta_membrane"),
+        get_organ("membrane"),
         VALID_CELLS_BY_TISSUE,
         cell_model_id,
     )

@@ -16,14 +16,14 @@ from projects.cord_membrane.spatial_analysis.geometry import alpha_triangles
 
 # Cell types that leukocytes are compared against, by organ
 TARGET_CELLS = {
-    "placenta_cord": ["VMY", "MES", "FIB", "MFB", "EPI"],
-    "placenta_membrane": ["EVT", "MAT", "MES", "FIB", "EPI"],
+    "cord": ["VMY", "MES", "FIB", "MFB", "EPI"],
+    "membrane": ["EVT", "MAT", "MES", "FIB", "EPI"],
 }
 
 
 def main(
     run_id: int = typer.Option(...),
-    organ_name: str = typer.Option(..., help="placenta_cord or placenta_membrane"),
+    organ_name: str = typer.Option(..., help="cord or membrane"),
     project_name: str = "cord_membrane",
     db_name: str = "main.db",
     custom_path: Optional[str] = None,
@@ -57,11 +57,11 @@ def main(
     Run after postprocessing.run_postprocessing (or after tissue inference with
     --no-reclassed):
         python -m projects.cord_membrane.spatial_analysis.colocalisation.run_colocalisation \\
-            --run-id 1 --organ-name placenta_membrane
+            --run-id 1 --organ-name membrane
 
     Args:
         run_id: eval run with cell and tissue predictions
-        organ_name: placenta_cord or placenta_membrane (membrane rolls)
+        organ_name: cord or membrane (membrane rolls)
         project_name: project dir containing the embeddings and results
         db_name: database containing the eval run
         custom_path: project dir to read embeddings from, if not project_name

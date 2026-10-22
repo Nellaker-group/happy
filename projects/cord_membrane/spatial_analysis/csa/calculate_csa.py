@@ -135,7 +135,7 @@ def measure_vessels(
         measurements: output of measure_areas
         coords: (N, 2) cell coordinates in pixels
         cell_predictions: (N,) cell class ids, after reclass_cell if used
-        organ: placenta_cord organ
+        organ: cord organ
         pixel_size: microns per pixel
         min_endothelial_cells: minimum endothelial cells for the ellipse and wall thickness
     Returns:

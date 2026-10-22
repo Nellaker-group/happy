@@ -20,7 +20,7 @@ from projects.cord_membrane.spatial_analysis.plots.style import (
 
 def main(
     run_id: int = typer.Option(...),
-    organ_name: str = typer.Option(..., help="placenta_cord or placenta_membrane"),
+    organ_name: str = typer.Option(..., help="cord or membrane"),
     project_name: str = "cord_membrane",
     tissue: Optional[str] = None,
 ):
@@ -33,11 +33,11 @@ def main(
 
     Run after run_colocalisation:
         python -m projects.cord_membrane.spatial_analysis.plots.plot_colocalisation \\
-            --run-id 1 --organ-name placenta_membrane
+            --run-id 1 --organ-name membrane
 
     Args:
         run_id: eval run the colocalisation was run on
-        organ_name: placenta_cord or placenta_membrane (membrane rolls)
+        organ_name: cord or membrane (membrane rolls)
         project_name: project dir containing the results
         tissue: tissue label if run_colocalisation was run with --tissue
     """
