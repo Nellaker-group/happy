@@ -47,6 +47,9 @@ def main(
     Tissue embeddings save path (and this is logged in the db):
     projects/{project_name}/results/embeddings/{lab_id}/{slide_name}/run_{run_id}_tissues.hdf5
 
+    For umbilical cord (cord) and membrane rolls (membrane), predictions are then reclassified into
+    run_{run_id}_reclassed.hdf5 alongside it (see projects/cord_membrane/postprocessing).
+
     Args:
         seed: random seed for reproducibility
         project_name: name of the project directory
@@ -142,6 +145,11 @@ def main(
     db.set_tissue_graph_params(run_id, k, graph_method.value)
     db.set_tissue_model(run_id, tissue_model_id)
     db.mark_tissue_as_done(run_id)
+
+    if save_embeddings and organ_name in ("cord", "membrane"):
+        # cord / membrane postprocessing: reclassify tissues and cells into run_X_reclassed.hdf5
+        from projects.cord_membrane.postprocessing.run_postprocessing import reclassify
+        reclassify(run_id, organ_name, project_name, custom_path)
 
 
 def _save_embeddings_as_hdf5(

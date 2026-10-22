@@ -28,14 +28,14 @@ from projects.cord_membrane.postprocessing.reclassed_file import (
 )
 
 RECLASS_CELL = {
-    "placenta_cord": reclass_cord_cell,
-    "placenta_membrane": reclass_membrane_cell,
+    "cord": reclass_cord_cell,
+    "membrane": reclass_membrane_cell,
 }
 
 
 def main(
     run_id: int = typer.Option(...),
-    organ_name: str = typer.Option(..., help="placenta_cord or placenta_membrane"),
+    organ_name: str = typer.Option(..., help="cord or membrane"),
     project_name: str = "cord_membrane",
     db_name: str = "main.db",
     custom_path: Optional[str] = None,
@@ -57,13 +57,14 @@ def main(
     reassigned. The original predictions in the database and HDF5 files are not
     changed. CSA and colocalisation read the reclassified file.
 
-    Run after tissue inference:
+    tissue_inference runs this automatically for cord and membrane
+    with the defaults below. To rerun with other settings after tissue inference:
         python -m projects.cord_membrane.postprocessing.run_postprocessing \\
-            --run-id 1 --organ-name placenta_cord
+            --run-id 1 --organ-name cord
 
     Args:
         run_id: eval run with cell and tissue predictions
-        organ_name: placenta_cord or placenta_membrane (membrane rolls)
+        organ_name: cord or membrane (membrane rolls)
         project_name: project dir containing the embeddings
         db_name: database containing the eval run
         custom_path: project dir to read embeddings from, if not project_name
@@ -81,6 +82,43 @@ def main(
     if organ_name not in RECLASS_CELL:
         raise typer.BadParameter(f"organ_name must be one of {list(RECLASS_CELL)}")
     db.init(db_name)
+    reclassify(
+        run_id,
+        organ_name,
+        project_name,
+        custom_path,
+        relabel_vessels,
+        relabel_remnants,
+        reclass_cells,
+        cell_model_id,
+        k,
+        graph_method,
+        max_section_edge_um,
+        max_vessel_edge_um,
+        min_vessel_size,
+    )
+
+
+def reclassify(
+    run_id,
+    organ_name,
+    project_name="cord_membrane",
+    custom_path=None,
+    relabel_vessels=True,
+    relabel_remnants=False,
+    reclass_cells=True,
+    cell_model_id=None,
+    k=8,
+    graph_method=MethodArg.intersection,
+    max_section_edge_um=230.0,
+    max_vessel_edge_um=140.0,
+    min_vessel_size=500,
+):
+    """Reclassify a run into run_X_reclassed.hdf5 (see main for the arguments).
+
+    Expects the database to be initialised already, so tissue_inference can call
+    it straight after tissue inference.
+    """
     organ = get_organ(organ_name)
     pixel_size = db.get_slide_pixel_size_by_evalrun(run_id)
     hdf5_data = load_hdf5_data(
@@ -89,7 +127,7 @@ def main(
     coords = hdf5_data.coords
 
     tissue_predictions = hdf5_data.tissue_predictions
-    is_cord = organ_name == "placenta_cord"
+    is_cord = organ_name == "cord"
     relabel_vessels = relabel_vessels and is_cord
     relabel_remnants = relabel_remnants and is_cord
     if relabel_vessels or relabel_remnants:

@@ -19,7 +19,11 @@ def get_reclassed_path(project_name, run_id):
 
 
 def find_embeddings_file(project_name, run_id, tissue=False, custom_path=None):
-    """A run's cell (or tissue) HDF5 file, from custom_path if it is there, otherwise project_name."""
+    """A run's cell (or tissue) HDF5 file, from custom_path if it is there, otherwise project_name.
+
+    Tissue files are looked for in project_name first, as tissue inference always
+    saves there, so a fresh run is not shadowed by an older file in custom_path.
+    """
     eval_run = db.get_eval_run_by_id(run_id)
     if not eval_run.embeddings_path:
         raise ValueError(f"No embeddings path recorded for run {run_id}")
@@ -32,6 +36,8 @@ def find_embeddings_file(project_name, run_id, tissue=False, custom_path=None):
 
     roots = [Path(custom_path)] if custom_path else []
     roots.append(get_project_dir(project_name))
+    if tissue:
+        roots.reverse()
     candidates = [root / "results" / "embeddings" / name for root in roots for name in names]
     for path in candidates:
         if path.exists():
