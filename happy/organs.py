@@ -74,21 +74,56 @@ PLACENTA = Organ(
 )
 PLACENTA_CORD = Organ(
     [
-        Cell("EPI", "Epithelial Cell", "#ff0000", 0, 0),
-        Cell("FIB", "Fibroblast", "#7b03fc", 1, 1),
-        Cell("MAC", "Macrophage", "#979903", 2, 2),
-        Cell("VEN", "Vascular Endothelial", "#734c0e", 3, 3),
-        Cell("VMY", "Vascular Myocyte", "#cc6633", 4, 4),
-        Cell("WBC", "White Blood Cell", "#2f3ec7", 5, 5),
-        Cell("MES", "Mesenchymal Cell", "#ff00ff", 6, 6),
+        Cell("EPI", "Epithelial Cell", "#332288", 0, 4),
+        Cell("VEN", "Vascular Endothelial", "#88CCEE", 1, 2),
+        Cell("MES", "Mesenchymal Cell", "#882255", 2, 1),
+        Cell("FIB", "Fibroblast", "#AA4499", 3, 1),
+        Cell("MFB", "Myofibroblast", "#CC6677", 4, 1),
+        Cell("VMY", "Vascular Myocyte", "#661100", 5, 1),
+        Cell("WBC", "Leukocyte", "#DDCC77", 6, 3),
     ],
-    [],
+    [
+        Tissue("Unlabelled", "Unlabelled", "#bab0ac", 0),
+        Tissue("AmnEpi", "Amniotic Epithelium", "#4e79a7", 1),
+        Tissue("SWJelly", "Subamniotic Wharton's Jelly", "#b07aa1", 2),
+        Tissue("IWJelly", "Intermediate Wharton's Jelly", "#ff9da7", 3),
+        Tissue("PWJelly", "Perivascular Wharton's Jelly", "#76b7b2", 4),
+        Tissue("UArtery", "Umbilical Artery", "#edc948", 5),
+        Tissue("UVein", "Umbilical Vein", "#59a14f", 6),
+        Tissue("Allantois", "Allantoic Duct Remnant", "#9c755f", 7),
+        Tissue("VitDuct", "Vitelline Duct Remnant", "#f28e2b", 8),
+        Tissue("VitVes", "Vitelline Vessel Remnant", "#e15759", 9),
+    ],
 )
+PLACENTA_MEMBRANE = Organ(
+    [
+        Cell("EPI", "Epithelial Cell", "#332288", 0, 2),
+        Cell("VEN", "Vascular Endothelial", "#88CCEE", 1, 2),
+        Cell("MES", "Mesenchymal Cell", "#882255", 2, 1),
+        Cell("FIB", "Fibroblast", "#AA4499", 3, 1),
+        Cell("MFB", "Myofibroblast", "#CC6677", 4, 1),
+        Cell("VMY", "Vascular Myocyte", "#661100", 5, 1),
+        Cell("CYT", "Cytotrophoblast", "#999933", 6, 0),
+        Cell("EVT", "Extra Villus Trophoblast", "#117733", 7, 0),
+        Cell("MAT", "Maternal Decidua", "#44AA99", 8, 3),
+        Cell("WBC", "Leukocyte", "#DDCC77", 9, 4),
+    ],
+    [
+        Tissue("Unlabelled", "Unlabelled", "#000000", 0),
+        Tissue("Amnion", "Amnion", "#CC79A7", 1),
+        Tissue("CMembrane", "Chorion Laeve", "#56B4E9", 2),
+        Tissue("RVilli", "Villous Remnant", "#0072B2", 3),
+        Tissue("Decidua", "Decidua Capsularis", "#E69F00", 4),
+        Tissue("SArtery", "Spiral Artery", "#D55E00", 5),
+    ],
+)
+
 
 
 def get_organ(organ_name):
     organ_dicts = {
         "placenta": PLACENTA,
         "placenta_cord": PLACENTA_CORD,
+        "placenta_membrane": PLACENTA_MEMBRANE,
     }
     return organ_dicts[organ_name]

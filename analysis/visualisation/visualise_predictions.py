@@ -1,6 +1,8 @@
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Optional
 
+import h5py
 import typer
 import numpy as np
 import matplotlib.pyplot as plt
@@ -11,6 +13,7 @@ from happy.utils.utils import get_project_dir
 from happy.graph.graph_creation.get_and_process import get_hdf5_data
 
 NUC_COLOUR = "black"
+TITLES = {"he": "H&E", "nuclei": "Nuclei", "cells": "Cells", "tissues": "Tissues"}
 
 
 def main(
@@ -18,6 +21,9 @@ def main(
     organ_name: str = typer.Option(...),
     db_name: str = typer.Option("main.db", help="Database file in happy/db/, or an absolute path to a .db file"),
     custom_embeddings_path: Optional[str] = typer.Option(None, help="Custom root path to the project embeddings (overrides default)"),
+    hdf5_file: Optional[str] = typer.Option(
+        None, help="HDF5 file to plot cell/tissue predictions from instead of the run's embeddings"
+    ),
     eval_id: Optional[int] = typer.Option(
         None, help="Eval run id to plot (required for --nuc/--cell/--tissue)"
     ),
@@ -29,8 +35,10 @@ def main(
     cell: bool = typer.Option(False, help="Plot cell predictions (organ colours)"),
     tissue: bool = typer.Option(False, help="Plot tissue predictions (organ colours)"),
     overlay: bool = typer.Option(False, help="Plot predictions over the H&E"),
+    one_plot: bool = typer.Option(False, help="Save all enabled layers side by side in one figure"),
     he_max_size: int = typer.Option(4000, help="Max H&E thumbnail dimension in px"),
-    point_size: float = typer.Option(0.5, help="Scatter point size"),
+    point_size: float = typer.Option(0.8, help="Scatter point size"),
+    dpi: int = typer.Option(600, help="Resolution of the saved figures"),
     save_dir: str = typer.Option(
         "visualisations/predictions", help="Dir (relative to project) to save to"
     ),
@@ -42,6 +50,7 @@ def main(
     Pass --eval-id to plot predictions 
     pass just --slide-id with --he for an H&E image when no eval run exists 
     with --overlay, enabled prediction layers are drawn on top of the H&E thumbnail
+    with --one-plot, all enabled layers are saved side by side in one figure
     """
     if not any([he, nuc, cell, tissue]):
         raise typer.BadParameter("Enable at least one of --he / --nuc / --cell / --tissue")
@@ -64,27 +73,41 @@ def main(
     out_dir.mkdir(parents=True, exist_ok=True)
     stem = f"slide{slide_db_id}" + (f"_run{eval_id}" if eval_id is not None else "")
 
-    background = None
-    if he or overlay:
-        he_img, extent = _load_he(slide_path, he_max_size)
-        if he:
-            _save_he(he_img, extent, out_dir / f"{stem}_he.png")
-        if overlay:
-            background = (he_img, extent)
+    he_image = _load_he(slide_path, he_max_size) if he or overlay else None
 
     hdf5 = None
-    if cell or tissue:
+    if (cell or tissue) and hdf5_file:
+        hdf5 = _load_predictions_file(hdf5_file)
+    elif cell or tissue:
         hdf5 = get_hdf5_data(project_name, eval_id, 0, 0, -1, -1, tissue=tissue, custom_path=custom_embeddings_path)
 
+    # (name, coords, colours) for each enabled layer
+    panels = [("he", None, None)] if he else []
     if nuc:
-        coords = _nuclei_coords(eval_id)
-        _save_points(coords, NUC_COLOUR, out_dir / f"{stem}_nuclei.png", background, point_size)
+        panels.append(("nuclei", _nuclei_coords(eval_id), NUC_COLOUR))
     if cell:
-        colours = _organ_colours(organ.cells, hdf5.cell_predictions)
-        _save_points(hdf5.coords, colours, out_dir / f"{stem}_cells.png", background, point_size)
+        panels.append(("cells", hdf5.coords, _organ_colours(organ.cells, hdf5.cell_predictions)))
     if tissue:
-        colours = _organ_colours(organ.tissues, hdf5.tissue_predictions)
-        _save_points(hdf5.coords, colours, out_dir / f"{stem}_tissues.png", background, point_size)
+        panels.append(("tissues", hdf5.coords, _organ_colours(organ.tissues, hdf5.tissue_predictions)))
+    for name, coords, _ in panels:
+        if name != "he" and len(coords) == 0:
+            print(f"No points to plot for {name}, skipping")
+    panels = [p for p in panels if p[0] == "he" or len(p[1]) > 0]
+    if not panels:
+        return
+
+    if one_plot:
+        if he_image is not None:
+            limits = he_image[1]
+        else:
+            limits = _bounds(np.concatenate([np.asarray(p[1]) for p in panels]))
+        path = out_dir / f"{stem}_{'_'.join(p[0] for p in panels)}.png"
+        _save_panels(panels, he_image, overlay, point_size, limits, path, dpi)
+    else:
+        for panel in panels:
+            name, coords, _ = panel
+            limits = he_image[1] if name == "he" or overlay else _bounds(coords)
+            _save_panels([panel], he_image, overlay, point_size, limits, out_dir / f"{stem}_{name}.png", dpi)
 
 
 def _load_he(slide_path, max_size):
@@ -99,6 +122,17 @@ def _load_he(slide_path, max_size):
     thumb = np.asarray(slide.get_thumbnail((max_size, max_size)).convert("RGB"))
     slide.close()
     return thumb, (0, w, h, 0)
+
+
+def _load_predictions_file(path):
+    """Coordinates and cell / tissue predictions from any HDF5 file that has them."""
+    with h5py.File(path, "r") as f:
+        cell_key = "cell_predictions" if "cell_predictions" in f else "predictions"
+        return SimpleNamespace(
+            coords=f["coords"][:],
+            cell_predictions=f[cell_key][:] if cell_key in f else None,
+            tissue_predictions=f["tissue_predictions"][:] if "tissue_predictions" in f else None,
+        )
 
 
 def _nuclei_coords(run_id):
@@ -116,36 +150,32 @@ def _figsize(width, height, max_dim=15):
     return (max_dim / aspect, max_dim) if aspect >= 1 else (max_dim, max_dim * aspect)
 
 
-def _save_he(he_img, extent, path):
-    fig = plt.figure(figsize=_figsize(extent[1], extent[2]), dpi=300)
-    plt.imshow(he_img, extent=extent)
-    plt.axis("off")
-    fig.tight_layout()
-    plt.savefig(path, bbox_inches="tight", pad_inches=0.0)
-    plt.close()
-    print(f"Saved {path}")
-
-
-def _save_points(coords, colours, path, background, point_size):
+def _bounds(coords):
+    """(left, right, bottom, top) of the points, with y pointing down like the H&E."""
     coords = np.asarray(coords)
-    if coords.size == 0:
-        print(f"No points to plot for {path.name}, skipping")
-        return
-    xs, ys = coords[:, 0], coords[:, 1]
+    return (coords[:, 0].min(), coords[:, 0].max(), coords[:, 1].max(), coords[:, 1].min())
 
-    if background is not None:
-        he_img, extent = background
-        fig = plt.figure(figsize=_figsize(extent[1], extent[2]), dpi=300)
-        plt.imshow(he_img, extent=extent)
-        plt.scatter(xs, ys, marker=".", s=point_size, c=colours, zorder=1000)
-        plt.xlim(0, extent[1])
-        plt.ylim(extent[2], 0)
-    else:
-        fig = plt.figure(figsize=_figsize(xs.max() - xs.min(), ys.max() - ys.min()), dpi=300)
-        plt.scatter(xs, ys, marker=".", s=point_size, c=colours, zorder=1000)
-        plt.gca().invert_yaxis()
 
-    plt.axis("off")
+def _save_panels(panels, he_image, overlay, point_size, limits, path, dpi):
+    """Save one or more layers side by side, all drawn within the same limits."""
+    width, height = limits[1] - limits[0], limits[2] - limits[3]
+    panel_width, panel_height = _figsize(width, height, max_dim=8 if len(panels) > 1 else 15)
+    fig, axes = plt.subplots(
+        1, len(panels), figsize=(panel_width * len(panels), panel_height), dpi=dpi, squeeze=False
+    )
+    for ax, (name, coords, colours) in zip(axes[0], panels):
+        if name == "he" or overlay:
+            ax.imshow(he_image[0], extent=he_image[1])
+        if name != "he":
+            coords = np.asarray(coords)
+            ax.scatter(
+                coords[:, 0], coords[:, 1], marker="o", s=point_size, c=colours, linewidths=0, zorder=1000
+            )
+        ax.set_xlim(limits[0], limits[1])
+        ax.set_ylim(limits[2], limits[3])
+        ax.axis("off")
+        if len(panels) > 1:
+            ax.set_title(TITLES[name])
     fig.tight_layout()
     plt.savefig(path, bbox_inches="tight", pad_inches=0.0)
     plt.close()
