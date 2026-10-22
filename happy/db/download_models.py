@@ -15,7 +15,7 @@ The filenames below match those registry entries:
         cell-model-id 5   ->  resnet50_membrane_cell_classifier.pt
         tissue-model-id 2 ->  clustergcn_cord_tissue_classifier.pt
         tissue-model-id 3 ->  clustergcn_membrane_tissue_classifier.pt
-        (cord and membrane use nuc-model-id 1, which stays in projects/placenta/)
+        (cord and membrane use nuc-model-id 2, which stays in projects/placenta/)
 
 ! so don't need to add these to the database after downloading as already there
 
@@ -49,7 +49,7 @@ MODEL_FILES = {
 # files needed to run the full pipeline for each project
 PROJECT_FILES = {
     "placenta": [f for f, (project, _) in MODEL_FILES.items() if project == "placenta"],
-    "cord_membrane": ["nuclei/retinanet_placenta_nuclei_detector.pt"]
+    "cord_membrane": ["nuclei/yolo_multiorgan_nuclei_detector.pt"]
     + [f for f, (project, _) in MODEL_FILES.items() if project == "cord_membrane"],
 }
 
