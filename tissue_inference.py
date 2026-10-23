@@ -30,7 +30,7 @@ def main(
     group_knts: bool = typer.Option(True, help="Group KNT predictions into single nodes before inference (placenta-specific)"),
     model_type: SupervisedModelsArg = SupervisedModelsArg.sup_clustergcn,
     graph_method: MethodArg = MethodArg.intersection,
-    save_tsv: bool = True,
+    save_tsv: bool = False,
     save_embeddings: bool = typer.Option(True, help="NB will overwrite existing hdf5 file at path and run_id"),
     inf_patches: bool = False,
     custom_path: str = None,

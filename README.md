@@ -432,13 +432,15 @@ python cell_inference.py \
 ```
 
 Use `--run-nuclei-pipeline` / `--run-cell-pipeline` (both default on) to run only one stage,
-and `--db-name` to target a specific database. Export predictions for QuPath with
+and `--db-name` to target a specific database. Add `--save-tsv` to write a QuPath TSV
+(`run_<id>.tsv`) next to the embeddings hdf5, or export predictions afterwards with
 [`qupath/coord_to_tsv.py`](qupath/coord_to_tsv.py).
 
 ### 4. Tissue inference
 
 [`tissue_inference.py`](tissue_inference.py) builds the cell graph and runs the tissue GNN,
-saving a prediction PNG, a QuPath TSV, and a tissue-embeddings HDF5.
+saving a prediction PNG and a tissue-embeddings HDF5. Add `--save-tsv` to also write a
+QuPath TSV of the tissue predictions for qupath.
 
 ```bash
 python tissue_inference.py \

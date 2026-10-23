@@ -1,7 +1,10 @@
 import time
 import logging
+from pathlib import Path
 from typing import Optional
 
+import h5py
+import pandas as pd
 import typer
 
 from happy.organs import get_organ
@@ -30,6 +33,7 @@ def main(
     re_run_all_cell:bool = False,
     get_cuda_device_num: bool = False,
     verbose: bool = True,
+    save_tsv: bool = False,
 ):
     """Runs inference over a WSI for nuclei detection, cell classification, or both.
 
@@ -60,6 +64,7 @@ def main(
         re_run_all_cell: True if you want to run all the cells instead of just remaining cells. For testing purpose, with run_id and run_nuclei_pipeline = False to re run cell pipeline for all cells
         get_cuda_device_num: if you want the code to choose a gpu
         verbose: if you want to print the progress bar or not
+        save_tsv: save cell predictions as a TSV for loading into QuPath
     """
     device = get_device(get_cuda_device_num)
 
@@ -100,6 +105,7 @@ def main(
             device,
             re_run_all_cell,
             verbose,
+            save_tsv,
         )
         end = time.time()
         print(f"Cell evaluation time: {(end - start):.3f}")
@@ -145,6 +151,7 @@ def cell_eval_pipeline(
     device,
     re_run_all_cell,
     verbose,
+    save_tsv,
 ):
     organ = get_organ(organ_name)
     # Load model weights and push to device
@@ -168,6 +175,32 @@ def cell_eval_pipeline(
         dataloader, model, pred_saver, embeddings_path, device, verbose, re_run_all_cell
     )
     cell_infer.clean_up(pred_saver)
+
+    if save_tsv:
+        # an interrupted run leaves unfilled rows in the hdf5, so export finished one
+        if db.get_eval_run_by_id(pred_saver.id).cells_done:
+            _save_cell_preds_as_tsv(embeddings_path, organ)
+        else:
+            print("Cell inference not finished, skipping tsv")
+
+
+def _save_cell_preds_as_tsv(embeddings_path, organ):
+    print("Saving cell predictions as tsv")
+    with h5py.File(embeddings_path, "r") as f:
+        coords = f["coords"][:]
+        predictions = f["predictions"][:]
+    label_dict = {cell.id: cell.label for cell in organ.cells}
+    predicted_labels = [label_dict[label] for label in predictions]
+    cell_preds_df = pd.DataFrame(
+        {
+            "x": coords[:, 0].astype(int),
+            "y": coords[:, 1].astype(int),
+            "class": predicted_labels,
+        }
+    )
+    save_path = Path(embeddings_path).with_suffix(".tsv")
+    cell_preds_df.to_csv(save_path, sep="\t", index=False)
+    print(f"Saved cell predictions tsv to {save_path}")
 
 
 if __name__ == "__main__":
