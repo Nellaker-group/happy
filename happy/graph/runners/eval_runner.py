@@ -4,28 +4,6 @@ from typing import Optional
 import torch
 import torch.nn as nn
 from torch_geometric.data import Data
-
-# Attributes added to MessagePassing/nn.Module in newer PyG/PyTorch versions
-# that are absent from models saved with older versions.
-_COMPAT_ATTR_DEFAULTS = {
-    "_lazy_load_hook": None,
-    "_is_full_backward_hook": None,
-    "_forward_pre_hooks_with_kwargs": {},
-    "_forward_hooks_with_kwargs": {},
-    "_forward_hooks_always_called": {},
-    "_state_dict_pre_hooks": {},
-    "_decomposed_layers": 1,
-}
-
-def _patch_module_getattr():
-    _original = nn.Module.__getattr__
-    def _patched(self, name: str):
-        if name in _COMPAT_ATTR_DEFAULTS:
-            default = _COMPAT_ATTR_DEFAULTS[name]
-            object.__setattr__(self, name, default)
-            return default
-        return _original(self, name)
-    nn.Module.__getattr__ = _patched
 from torch_geometric.transforms import SIGN
 from torch_geometric.loader import (
     DataLoader,
@@ -35,6 +13,7 @@ from torch_geometric.loader import (
 
 from happy.models.graphsaint import GraphSAINT
 from happy.models.sign import SIGN as SIGN_MLP
+from happy.models.utils.module_update import load_model
 from happy.organs import Organ
 from happy.graph.enums import SupervisedModelsArg
 
@@ -90,10 +69,7 @@ class EvalRunner:
     @property
     def model(self):
         if self._model is None:
-            _patch_module_getattr()
-            self._model = torch.load(
-                self.params.pretrained, map_location=self.params.device
-            )
+            self._model = load_model(self.params.pretrained, self.params.device)
         return self._model
 
     @property

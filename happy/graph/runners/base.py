@@ -11,6 +11,7 @@ from sklearn.utils.class_weight import compute_class_weight
 
 from happy.organs import Organ
 from happy.graph.enums import SupervisedModelsArg
+from happy.models.utils.module_update import load_model
 
 
 @dataclass
@@ -111,7 +112,7 @@ class TrainRunner:
     def model(self):
         if self._model is None:
             if self.params.pretrained is not None:
-                self._model = torch.load(self.params.pretrained)
+                self._model = load_model(self.params.pretrained)
             else:
                 self._model = self.setup_model()
             self._model = self._model.to(self.params.device)
