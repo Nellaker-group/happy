@@ -40,6 +40,12 @@ class ClusterGCN(nn.Module):
             self.lin_bn2 = nn.BatchNorm1d(reduce_dims)
             self.lin3 = nn.Linear(reduce_dims, out_channels)
 
+    @property
+    def _legacy_head(self):
+        # models saved before batch norm was added to the head (e.g. the cord
+        # and membrane tissue models) have lin1 -> relu -> lin2 and no lin3
+        return not hasattr(self, "lin3")
+
     def forward(self, x, edge_index):
         for i, conv in enumerate(self.convs):
             x = conv(x, edge_index)
@@ -48,7 +54,12 @@ class ClusterGCN(nn.Module):
             x = self.bns[i](x)
             x = F.relu(x)
             x = F.dropout(x, p=self.dropout, training=self.training)
-        if self.reduce_dims is not None:
+        if self.reduce_dims is not None and self._legacy_head:
+            x = self.lin1(x)
+            x = F.relu(x)
+            x = F.dropout(x, p=self.dropout, training=self.training)
+            x = self.lin2(x)
+        elif self.reduce_dims is not None:
             x = self.lin1(x)
             x = self.lin_bn1(x)
             x = F.relu(x)
@@ -76,7 +87,13 @@ class ClusterGCN(nn.Module):
             if i == self.num_layers - 2 and self.reduce_dims is None:
                 embeddings = x_all.detach().cpu().clone()
 
-        if self.reduce_dims is not None:
+        if self.reduce_dims is not None and self._legacy_head:
+            x_all = x_all.to(device)
+            x_all = self.lin1(x_all)
+            x_all = F.relu(x_all)
+            embeddings = x_all.detach().cpu().clone()
+            x_all = self.lin2(x_all)
+        elif self.reduce_dims is not None:
             x_all = x_all.to(device)
             x_all = self.lin1(x_all)
             x_all = self.lin_bn1(x_all)
