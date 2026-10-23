@@ -46,11 +46,11 @@ def main(
     learning_rate: float = 0.001,
     weighted_loss: bool = True,
     use_custom_weights: bool = True,
-    val_patch_files: List[str] = typer.Option([], help="CSV files defining validation patch regions"),
-    test_patch_files: List[str] = typer.Option([], help="CSV files defining test patch regions"),
+    val_patch_files: List[str] = typer.Option([], help="Validation patch CSVs in graph_splits/: one per run id (paired by position), or one for all slides"),
+    test_patch_files: List[str] = typer.Option([], help="Test patch CSVs in graph_splits/: one per run id (paired by position), or one for all slides"),
     num_workers: int = 7,
     get_cuda_device_num: bool = typer.Option(False, help="Auto-select best GPU"),
-    add_to_db: bool = typer.Option(False, help="Register the final trained model in the database"),
+    add_to_db: bool = typer.Option(False, help="Register the best checkpoint by val accuracy in the database"),
     seed: int = 0,
     custom_embeddings_path: Optional[str] = typer.Option(None, help="Custom root path to project directory (overrides default embeddings path)"),
 ):
@@ -99,12 +99,15 @@ def main(
         include_validation: run validation during training
         validation_step: validate every N epochs
         tissue_label_csv: ground truth tissue annotation CSV files, one per run_id
-        val_patch_files: CSV files defining spatial regions for validation nodes
-        test_patch_files: CSV files defining spatial regions for test nodes
+        val_patch_files: CSV files defining spatial regions for validation nodes, one
+            per run_id (paired by position) or a single file applied to every slide
+        test_patch_files: CSV files defining spatial regions for test nodes, one per
+            run_id (paired by position) or a single file applied to every slide
         num_workers: dataloader worker processes
         get_cuda_device_num: auto-select GPU by free memory
-        add_to_db: register the final trained model in the database as a GraphModel,
-            printing the model id to use with tissue_inference --tissue-model-id
+        add_to_db: register the best checkpoint (by val accuracy, or the final
+            model without validation) in the database as a GraphModel, prints the
+            model id to use with tissue_inference --tissue-model-id
         seed: random seed for reproducibility
     """
     db.init(db_name)
@@ -127,6 +130,16 @@ def main(
     resolved_test_patches = (
         [graph_split_files_dir / f for f in test_patch_files] if test_patch_files else []
     )
+    # one patch file per slide (paired by position, like the label CSVs), or a
+    # single file applied to every slide
+    for name, files in (("val", resolved_val_patches), ("test", resolved_test_patches)):
+        if len(files) not in (0, 1, len(run_ids)):
+            raise typer.BadParameter(
+                f"Give one {name} patch file per run id ({len(run_ids)}) or a single "
+                f"file for all slides, not {len(files)}"
+            )
+        if len(files) == 1 and len(run_ids) > 1:
+            print(f"Applying {files[0].name} to every slide")
 
     # save graph parameters 
     graph_params = {
@@ -173,13 +186,13 @@ def main(
         )
         if is_mismatch:
             mismatched.append((run_id, n_labels, data.num_nodes))
-        # mask nodes based on provided validation/test patch files
+        # mask nodes based on this slide's validation/test patch files
         data = setup_splits_by_runid(
             data,
             tissue_class,
             include_validation,
-            resolved_val_patches,
-            resolved_test_patches,
+            _patches_for_slide(resolved_val_patches, i, len(run_ids)),
+            _patches_for_slide(resolved_test_patches, i, len(run_ids)),
         )
         datas.append(data)
 
@@ -226,20 +239,35 @@ def main(
     train_runner.params.save(seed, exp_name, run_path)
 
     # train model and save checkpoints !
-    best_val = _train(train_runner, logger, run_path, include_validation, patience)
+    best_val, best_epoch = _train(
+        train_runner, logger, run_path, include_validation, patience
+    )
 
-    # optionally register the final model in the database for use by tissue_inference
+    # optionally register the best checkpoint (or the final model if there was no
+    # validation) in the database for use by tissue_inference
     if add_to_db:
-        final_model_path = run_path / "final_graph_model.pt"
+        if best_epoch is not None:
+            model_path = run_path / f"{best_epoch}_graph_model.pt"
+            performance = round(best_val, 4)
+        else:
+            model_path = run_path / "final_graph_model.pt"
+            performance = None
         graph_model = GraphModel.create(
-            path=str(final_model_path.resolve()),
+            path=str(model_path.resolve()),
             hyperparameters_path=str((run_path / "train_params.json").resolve()),
             exp_name=exp_name,
             model_type=model_type_val,
             organ=organ_name,
-            performance=round(best_val, 4),
+            performance=performance,
         )
-        print(f"Saved final model to db with id {graph_model.id}")
+        print(f"Saved {model_path.name} to db with id {graph_model.id}")
+
+
+def _patches_for_slide(patch_files, i, num_slides):
+    # one file per slide is paired by position, a single file applies to every slide
+    if len(patch_files) == num_slides:
+        return [patch_files[i]]
+    return patch_files
 
 
 def _train(train_runner, logger, run_path, include_validation, patience=20):
@@ -247,12 +275,14 @@ def _train(train_runner, logger, run_path, include_validation, patience=20):
 
     Saves the best model checkpoint (by validation accuracy) and a final checkpoint.
     Stops early if validation accuracy does not improve for `patience` validation steps.
+    Returns the best validation accuracy and its epoch (None without validation).
     """
     train_runner.prepare_data()
     epochs = train_runner.params.epochs
     validation_step = train_runner.params.validation_step
 
     prev_best_val = 0
+    best_epoch = None
     epochs_without_improvement = 0
     val_accuracy = 0.0
 
@@ -273,6 +303,7 @@ def _train(train_runner, logger, run_path, include_validation, patience=20):
                     train_runner.save_state(run_path, epoch)
                     epochs_without_improvement = 0
                     prev_best_val = val_accuracy
+                    best_epoch = epoch
                 else:
                     epochs_without_improvement += 1
 
@@ -295,7 +326,7 @@ def _train(train_runner, logger, run_path, include_validation, patience=20):
     train_runner.save_state(run_path, "final")
     tqdm.write(f"Saved final model to {run_path / 'final_graph_model.pt'}")
 
-    return prev_best_val
+    return prev_best_val, best_epoch
 
 
 def _save_graph_params(graph_params_dict, run_path):
