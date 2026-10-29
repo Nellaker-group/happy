@@ -13,8 +13,12 @@ HAPPY is a three-stage deep learning pipeline for whole slide images (WSIs):
 The core code is **organ-agnostic**; but trained and written for the placenta.
 
 **Trained model weights** are now on [Hugging Face](https://huggingface.co/emrwlkr/HAPPY)!
-Download with `python -m happy.db.download_models --project-name placenta` — see
-[Using our trained models](#using-our-trained-models).
+Download with `python -m happy.db.download_models --project-name placenta` (or
+`--project-name cord_membrane`) — see [Using our trained models](#using-our-trained-models).
+
+> **HAPPY v.Umbilical cord and fetal membranes (Oct 2026):** cell and tissue models for H&E sections
+> of umbilical cord and fetal membrane rolls, with postprocessing and spatial analyses. Paper under development — please
+> contact us if using them. See [Umbilical cord and fetal membranes](#umbilical-cord-and-fetal-membranes).
 
 > **HAPPY v3.0 (June 2026):** debugged(!) tissue graph model, faster nuc inference, improved visualisations, core code is organ agnostic
 > note nuclei inf/ training now uses YOLOv26. (inf still compatible with 
@@ -61,6 +65,7 @@ If you use these versions or the models distributed with them, please also cite:
 - [Multi-slide inference (avoiding SQLite locking)](#multi-slide-inference-avoiding-sqlite-locking)
 - [Extracting metrics and downstream analysis](#extracting-metrics-and-downstream-analysis)
 - [Visualisation](#visualisation)
+- [Umbilical cord and fetal membranes](#umbilical-cord-and-fetal-membranes)
 - [Update to HAPPY v2](#update-to-happy-v2)
 - [Update to HAPPY v3](#update-to-happy-v3)
 
@@ -136,6 +141,8 @@ NB if having error `no module name 'happy'`, rerun `pip install -e .` in the roo
 The core code is organ-agnostic. Add organ-specific cell and tissue definitions
 (names, ids, colours) to [`happy/organs.py`](happy/organs.py), and add a project under
 `projects/{project_name}/` using [`projects/placenta`](projects/placenta) as a template.
+[`projects/cord_membrane`](projects/cord_membrane) is a second example, with its own
+postprocessing and spatial analyses.
 
 Specific organ processing required (e.g. grouping syn knots for placenta, live under project dir)
 
@@ -157,7 +164,9 @@ python -m happy.db.migrate_db_schema --db-name /abs/path/to/other.db
 
 ## Using our trained models?
 
-If you just want to run our placenta models on your own slides, you can **skip training
+If you just want to run our placenta models (or our
+[umbilical cord and fetal membrane models](#umbilical-cord-and-fetal-membranes)) on your own
+slides, you can **skip training
 and ground-truth creation** and go straight to [WSI inference](#wsi-inference). Before
 using the models on a new cohort we recommend validating them on a small amount of your
 own ground truth using the [evaluation scripts](#evaluation).
@@ -202,6 +211,16 @@ python -m happy.db.download_models --project-name placenta
 ```
 
 This fetches all four weight files to `projects/placenta/trained_models/`, matching those register in the db. 
+
+For the umbilical cord and fetal membrane models:
+
+```bash
+python -m happy.db.download_models --project-name cord_membrane
+```
+
+This fetches the four cord and membrane files to `projects/cord_membrane/trained_models/`,
+and the YOLO nuclei detector to `projects/placenta/trained_models/`, where `main.db` expects
+them.
 
 ---
 
@@ -614,6 +633,93 @@ Ground-truth viewers:
 annotations) and [`vis_groundtruth_graph.py`](analysis/visualisation/vis_groundtruth_graph.py)
 (tissue points), plus [`vis_graph_patch.py`](analysis/visualisation/vis_graph_patch.py) for a
 region of the cell graph.
+
+---
+
+## Umbilical cord and fetal membranes
+
+Cell and tissue models for H&E sections of umbilical cord and fetal membranes (membrane
+rolls), in the [`cord_membrane`](projects/cord_membrane) project. These models are still
+under development — please contact us if using them.
+
+### Models
+
+Both organs use the multi-organ YOLO nuclei detector. `main.db` registers the
+models under these ids (download them with
+`python -m happy.db.download_models --project-name cord_membrane`):
+
+| | Umbilical cord | Fetal membranes |
+|---|---|---|
+| `--organ-name` | `cord` | `membrane` |
+| Nuclei detection | `--nuc-model-id 2` (YOLO) | `--nuc-model-id 2` (YOLO) |
+| Cell classification | `--cell-model-id 4` | `--cell-model-id 5` |
+| Tissue classification | `--tissue-model-id 2` | `--tissue-model-id 3` |
+
+
+### Inference
+
+The same steps as [WSI inference](#wsi-inference), with the `cord_membrane` project and the
+ids above:
+
+```bash
+# umbilical cord
+python cell_inference.py --project-name cord_membrane --organ-name cord \
+    --nuc-model-id 2 --cell-model-id 4 --slide-id <slide>
+python tissue_inference.py --project-name cord_membrane --organ-name cord \
+    --tissue-model-id 2 --run-id <run> --k 10
+
+# fetal membranes
+python cell_inference.py --project-name cord_membrane --organ-name membrane \
+    --nuc-model-id 2 --cell-model-id 5 --slide-id <slide>
+python tissue_inference.py --project-name cord_membrane --organ-name membrane \
+    --tissue-model-id 3 --run-id <run> --k 10
+```
+
+### Postprocessing
+
+With `--organ-name cord` or `membrane`, `tissue_inference.py` also reclassifies the
+predictions based on spatial analysis and saves them alongside the tissue predictions as
+`run_<id>_reclassed.hdf5`:
+
+- **Umbilical cord:** umbilical arteries and veins are relabelled so each vessel has a single
+  label, with the largest vessel of each cord as the vein.
+- **Both:** cells whose predicted type cannot occur in their predicted tissue are reassigned
+  to the most likely type that can.
+
+The original predictions are not changed. This is automatically done during tissue inference, but can also be run afterwards with:
+
+```bash
+python -m projects.cord_membrane.postprocessing.run_postprocessing \
+    --run-id 1 --organ-name cord
+```
+
+### Spatial analysis
+
+Both analyses read the reclassified file (pass `--no-reclassed` to use the original
+predictions) and save to `projects/cord_membrane/results/`.
+
+**Cross-sectional area (umbilical cord).** Measures the area, perimeter, diameters and
+eccentricity of each cord section, the area of each vessel and of Wharton's jelly, and the
+lumen, wall area, Wagenworth index and wall thickness of each vessel. Saves CSVs and QuPath
+GeoJSON outlines to `results/csa/`.
+
+```bash
+python -m projects.cord_membrane.spatial_analysis.csa.run_csa --run-id 1
+python -m projects.cord_membrane.spatial_analysis.plots.plot_csa --run-id 1
+```
+
+**Leukocyte colocalisation (both).** Ripley's cross-K between leukocytes and each target cell
+type (cord: VMY, MES, FIB, MFB, EPI; membrane: EVT, MAT, MES, FIB, EPI), compared with
+leukocytes scattered at random over the same tissue. A ratio above 1 means leukocytes cluster
+around that cell type, below 1 that they avoid it. Saves curves and a summary to
+`results/colocalisation/`; `--tissue` restricts the analysis to one tissue.
+
+```bash
+python -m projects.cord_membrane.spatial_analysis.colocalisation.run_colocalisation \
+    --run-id 1 --organ-name membrane
+python -m projects.cord_membrane.spatial_analysis.plots.plot_colocalisation \
+    --run-id 1 --organ-name membrane
+```
 
 ---
 
