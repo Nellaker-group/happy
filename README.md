@@ -640,7 +640,7 @@ region of the cell graph.
 
 <img src="readme_images/cord_tissue_predictions.png" width="700" />
 
-<img src="readme_images/membrane_tissue_predictions.png" width="700" />
+<img src="readme_images/membrane_roll_tissue_predictions.png" width="700" />
 
 Cell and tissue models for H&E sections of umbilical cord and fetal membranes (membrane
 rolls), in the [`cord_membrane`](projects/cord_membrane) project. These models are still
