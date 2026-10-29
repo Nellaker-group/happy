@@ -42,8 +42,8 @@ class ClusterGCN(nn.Module):
 
     @property
     def _legacy_head(self):
-        # models saved before batch norm was added to the head (e.g. the cord
-        # and membrane tissue models) have lin1 -> relu -> lin2 and no lin3
+        # models saved before batch norm was added to the head (e.g. the original
+        # 2025 cord and membrane tissue models) have lin1 -> relu -> lin2 and no lin3
         return not hasattr(self, "lin3")
 
     def forward(self, x, edge_index):
