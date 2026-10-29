@@ -198,6 +198,10 @@ def plot_tissue_pr_curves(id_to_label, colours, ground_truth, preds, scores, sav
     unique_values_in_both = list(unique_values_in_pred.union(unique_values_in_truth))
 
     ground_truth = label_binarize(ground_truth, classes=unique_values_in_both)
+    # with exactly two classes label_binarize returns one column (the second class),
+    # so add the first class's column back to index both the same way
+    if len(unique_values_in_both) == 2:
+        ground_truth = np.hstack([1 - ground_truth, ground_truth])
     scores = np.array(scores)
     scores = softmax(scores, axis=-1)
 
