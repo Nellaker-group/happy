@@ -135,7 +135,10 @@ class CellDataset(MSDataset):
     def _iter_data(self, iter_start, iter_end):
         cell_coord = self.remaining_data[iter_start: iter_end] # get cell xys from nuclei referencing results
         big_tile_xys = self.file.get_big_tile_xy(cell_coord,tile_tilesize=self.tile_size,tile_overlap=224) # get all top left xys for big tiles
-        
+        # cells exactly on the boundary between two big tiles are in both, so track
+        # which have been yielded. Otherwise duplicates overrun the embeddings hdf5
+        seen = set()
+
         # iterate through each big tile
         for big_tile_coord in big_tile_xys:
 
@@ -146,6 +149,10 @@ class CellDataset(MSDataset):
 
             # get centriod xys of each cell within the big tile range (related to WSI coordinate)
             coord_list = self.file.get_xys_in_big_tile(big_tile_coord,cell_coord,tile_tilesize=self.tile_size,tile_overlap=224)
+            coord_list = [xy for xy in coord_list if (xy[0], xy[1]) not in seen]
+            seen.update((xy[0], xy[1]) for xy in coord_list)
+            if not coord_list:
+                continue
 
             # iterate through each cell image within the big tile
             for img, coord in self._get_dataset_section(big_xy=big_tile_coord,

@@ -6,10 +6,12 @@ matplotlib==3.8.2
 pandas==2.1.4
 peewee==3.17.0
 pretrainedmodels==0.7.4
+six  # needed by pretrainedmodels, not declared by it
 pytest==7.4.3
 scikit-learn-extra==0.3.0
 seaborn==0.13.0
 typer==0.9.0
+click<8.2  # typer==0.9.0 breaks with click>=8.2, which other packages can pull in
 visdom==0.2.4
 umap-learn==0.5.4
 openslide-python==1.3.1

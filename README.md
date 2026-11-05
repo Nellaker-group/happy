@@ -195,9 +195,14 @@ own ground truth using the [evaluation scripts](#evaluation).
 
 Trained weights are hosted on the [Hugging Face Hub](https://huggingface.co/emrwlkr/HAPPY).
 The shipped `main.db` already **registers these models by id**, so you just need to download
-the weight files into the project's `trained_models/` dir — no manual registration required:
+the weight files into the project's `trained_models/` dir — no manual registration required.
+
+The model repo is gated, so first request access on the
+[model page](https://huggingface.co/emrwlkr/HAPPY), then log in once with a read token
+from your [Hugging Face settings](https://huggingface.co/settings/tokens):
 
 ```bash
+huggingface-cli login
 python -m happy.db.download_models --project-name placenta
 ```
 

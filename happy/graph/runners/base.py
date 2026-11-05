@@ -111,7 +111,8 @@ class TrainRunner:
     def model(self):
         if self._model is None:
             if self.params.pretrained is not None:
-                self._model = torch.load(self.params.pretrained)
+                # graph models are pickled whole, which torch>=2.6 refuses by default
+                self._model = torch.load(self.params.pretrained, weights_only=False)
             else:
                 self._model = self.setup_model()
             self._model = self._model.to(self.params.device)

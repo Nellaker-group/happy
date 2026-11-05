@@ -91,8 +91,11 @@ class EvalRunner:
     def model(self):
         if self._model is None:
             _patch_module_getattr()
+            # graph models are pickled whole, which torch>=2.6 refuses by default
             self._model = torch.load(
-                self.params.pretrained, map_location=self.params.device
+                self.params.pretrained,
+                map_location=self.params.device,
+                weights_only=False,
             )
         return self._model
 
