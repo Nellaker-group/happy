@@ -49,7 +49,8 @@ def load_model(model_path, device="cpu"):
     # the file itself loads, so this patch is always applied
     _patch_module_getattr()
     try:
-        return torch.load(model_path, map_location=device)
+        # models are pickled whole, which torch>=2.6 refuses by default
+        return torch.load(model_path, map_location=device, weights_only=False)
     except (AttributeError, ModuleNotFoundError) as e:
         print(
             f"Could not load {model_path} with the current PyTorch / PyTorch "
@@ -63,7 +64,7 @@ def load_model(model_path, device="cpu"):
 def _load_with_patches(model_path):
     _patch_pyg_module_paths()
     _patch_message_passing_setstate()
-    model = torch.load(model_path, map_location="cpu")
+    model = torch.load(model_path, map_location="cpu", weights_only=False)
     _inject_missing_attributes(model)
     return model
 
