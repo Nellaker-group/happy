@@ -118,7 +118,9 @@ def _cluster_knts_into_point(knt_hdf5_data, cut_off_count, unique_indices):
     for ind in remaining_inds:
         inds_to_remove.extend(list(ind[1:]))
     # remove duplicates inds
-    inds_to_remove = np.array(inds_to_remove)
+    # dtype=int: if no KNT groups are large enough this is empty, which defaults to
+    # float and np.delete can't index with floats
+    inds_to_remove = np.array(inds_to_remove, dtype=int)
     unique_inds_to_remove = np.unique(inds_to_remove)
 
     # remove clustered
