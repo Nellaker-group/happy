@@ -43,7 +43,8 @@ def main(
     )
 
     for filename in os.listdir(slides_dir):
-        if filename.endswith(slide_file_format):
+        # skip hidden files, e.g. macOS '._' AppleDouble metadata files
+        if filename.endswith(slide_file_format) and not filename.startswith("."):
             try:
                 Slide.create(slide_name=filename, pixel_size=pixel_size, lab=lab[0])
             except peewee.IntegrityError:
